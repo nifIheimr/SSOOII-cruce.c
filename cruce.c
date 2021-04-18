@@ -42,6 +42,8 @@ void sig_action (int signal) {
 
 void crearHijo();
 
+//PRUEBA DE PUSH
+
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
  	int i;
