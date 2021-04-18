@@ -59,7 +59,7 @@ void crearHijo();
 	//2. INICIALIZAR VARIABLES, MECANISMOS IPC, HANDLERS DE SENALES...
 	
 
-	if(sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600) == -1) { printf("Error semget\n"); };
+	if((sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); };
 	
 	//1 = numero de procesos que entran a la vez
 	if (semctl(sem, 0, SETVAL, 1) == -1) { printf("Error semctl\n"); }
@@ -75,13 +75,11 @@ void crearHijo();
 	sopsSalir.sem_flg = 0;
 	 
 	 
-	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1); { printf("Error memid\n"); exit (-3); };
+	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { printf("Error memid\n"); exit (-3); };
 	
 	mc = shmat(memid, NULL, 0);
 	//3. LLAMAR A CRUCE_inicio
-	printf("antes de cruce");
 	int ret = CRUCE_inicio(velocidad, nproc, sem, mc);
-	printf("%d\n", ret);
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
 	for(i = 0; i < nproc; i++) {
@@ -90,11 +88,11 @@ void crearHijo();
 		}
 	}
 	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
-	//while(1) {
+	while(1) {
 		//5.1
 		//5.2
 		//5.3
-	//}
+	}
 		
 		
 	//6. CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
@@ -107,9 +105,8 @@ void crearHijo();
  	
  	switch(pid) {
  		case -1:
+ 			system("clear");
  			perror("Error creando hijos\n");
  			exit(-1);
- 		case 0:
- 			printf("Creado hijo %d\n", getpid());
  	}
  } 
