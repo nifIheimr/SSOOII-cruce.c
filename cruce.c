@@ -21,7 +21,7 @@
 #define FALSE   0
 #define MAXPROC 10
 #define NSEMAFOROS 4
-#define TAMMC 256
+#define TAMMC 1024
 int sem;
 
 void sig_action (int signal) {
@@ -43,11 +43,10 @@ void sig_action (int signal) {
 void crearHijo();
 
 //PRUEBA DE PUSH
-
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
  	int i;
- 	char *mc =  NULL;
+ 	char *mc=NULL;
  	int memid;
  	
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
@@ -73,22 +72,34 @@ void crearHijo();
 	sopsSalir.sem_num = 0;
 	sopsSalir.sem_op = 1; //Signal
 	sopsSalir.sem_flg = 0;
-	 
-	 
-	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1); { printf("Error memid\n"); exit (-3); };
 	
-	mc = shmat(memid, NULL, 0);
+	/*if(getpid()==PPADRE){
+		if(memid=shmget(IPC_PRIVATE,TAMMC,IPC_CREAT|0600)==-1){
+			fprintf(stderr,"Error al reservar la memoria compartida");
+		}
+		mc=shmat(memid,NULL,0);
+		printf("\nMemoria compartida creada\n");
+		int ret = CRUCE_inicio(velocidad, nproc, sem, mc);
+		printf("%d\n", ret);
+		shmdt(&mc);//Desasociacion
+		CRUCE_fin();
+	
+		
+	}*/
+	if(semctl(sem, 0, IPC_RMID) == -1) { printf("Error semctl\n"); }
 	//3. LLAMAR A CRUCE_inicio
-	printf("antes de cruce");
-	int ret = CRUCE_inicio(velocidad, nproc, sem, mc);
-	printf("%d\n", ret);
-	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
+
+	
+	
+	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	for(i = 0; i < nproc; i++) {
-		if(getpid() == PPADRE) {
+		if(getpid()==PPADRE){
 			crearHijo();
 		}
 	}
+	
+
 	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
 	//while(1) {
 		//5.1
