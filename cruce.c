@@ -22,33 +22,46 @@
 #define MAXPROC 10
 #define NSEMAFOROS 4
 #define TAMMC 256
+
 int sem;
+char *mc =  NULL;
+int memid;
+struct sembuf sops[4];
 
 void sig_action (int signal) {
 	if(signal == SIGINT) {
 		printf("\nInterrupción\n");
-		int retorno;
-
-		//Esperar al hijo
-		wait(&retorno);
-
-		//Borrar semáforos
-
-		if(semctl(sem, 0, IPC_RMID) == -1) { printf("Error semctl\n"); }
-
+		
+		shmdt(&mc);//Desasociacion
+		if(shmctl(memid,IPC_RMID,NULL)==-1){
+			fprintf(stderr,"Error Liberar Memoria Compartida");
+		}
+		if(semctl(sem, 0, IPC_RMID) == -1){
+	 		fprintf(stderr,"Error semctl\n"); 
+		}
 		exit(0);
 	}
 }
+void waitf(int numsem,int numwait){
+	sops[numsem].sem_num = 0;
+	sops[numsem].sem_op = -numwait; //Wait
+	sops[numsem].sem_flg = 0;
+}
+void signalf(int numsem,int numsignal){
+	sops[numsem].sem_num = 0;
+	sops[numsem].sem_op = numsignal; //signal
+	sops[numsem].sem_flg = 0;
+}
 
-void crearHijo();
+ void crearHijo();
 
 //PRUEBA DE PUSH
 
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
+ 	pid_t HIJOCICLOS;
  	int i;
- 	char *mc =  NULL;
- 	int memid;
+ 	
  	
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
 	if(argc < 3 || argc > 3) { exit(-1); } 
@@ -63,56 +76,96 @@ void crearHijo();
 	
 	//1 = numero de procesos que entran a la vez
 	if (semctl(sem, 0, SETVAL, 1) == -1) { printf("Error semctl\n"); }
-	
-	struct sembuf sopsEntrar, sopsSalir;
-
-	sopsEntrar.sem_num = 0;
-	sopsEntrar.sem_op = -1; //Wait
-	sopsEntrar.sem_flg = 0;
-
-	sopsSalir.sem_num = 0;
-	sopsSalir.sem_op = 1; //Signal
-	sopsSalir.sem_flg = 0;
+	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
-	struct posiciOn posicionsig;
-	
 	
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { printf("Error memid\n"); exit (-3); };
 	
 	mc = shmat(memid, NULL, 0);//Asociamos
 	//3. LLAMAR A CRUCE_inicio
-	int ret = CRUCE_inicio(velocidad, nproc, sem, mc);
+	CRUCE_inicio(velocidad, nproc, sem, mc);
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
-	for(i = 0; i < nproc; i++) {
+	struct posiciOn posicionsig,posnac,posicionsigsig;
+	posnac.x=0;
+	posnac.y=0;
+	posicionsigsig.x=0;
+	posicionsigsig.y=0;
+	
+	//CICLO SEMAFORICO
+	/*if(getpid()==PPADRE){
+		crearHijo();
+		while(1){
+			CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
+			CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
+			CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+			CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
+			for(int j=0;j<6;j++){
+				pausa();
+			}
+			
+		}
+	
+	}
+	*/
+	//while(1){
 		if(getpid() == PPADRE) {
-			posicionsig.x=0;
-			posicionsig.y=0; 
 			int tipo=CRUCE_nuevo_proceso();
-			printf("%d",tipo);
-			if(tipo==0){
+			
+			waitf(0,1);
+			if(semop(sem,sops,1)==-1){
+				printf("Error semop\n");
+			}
+
+			
+			
+			signalf(0,1);
+			if(semop(sem,sops,1)==-1){
+				printf("Error semop\n");
+			}
+			
+			while(posicionsigsig.y>=0){
+				sleep(2);
+				posicionsig=CRUCE_inicio_peatOn_ext(&posnac);
+				printf("%d %d\t",posnac.x,posnac.y);
+				sleep(3);
+				printf("%d %d\t",posicionsig.x,posicionsig.y);
+				//semaforo para entrar a la siguiente posicion
+				
+				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
+				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
+			}
+			sleep(3);
+			CRUCE_fin_peatOn();
+			
+			
+			
+			/*while(posicionsigsig.y>=0){
+				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
+				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
+				pausa();
+			}*/
+			/*if(tipo==0){
 				posicionsig=CRUCE_inicio_coche();
 				printf("%d %d\n",posicionsig.x,posicionsig.y);
 				CRUCE_avanzar_coche(posicionsig);
 				
 			}else{
-				posicionsig=CRUCE_inicio_peatOn();
-				printf("%d %d\n",posicionsig.x,posicionsig.y);
-				CRUCE_avanzar_peatOn(posicionsig);
+				printf("%d %d\t",posnac.x,posnac.y);
+				posicionsig=CRUCE_inicio_peatOn_ext(&posnac);
+				printf("%d %d\t",posnac.x,posnac.y);
+				printf("%d %d\t",posicionsig.x,posicionsig.y);
+				posnac=CRUCE_avanzar_peatOn(posicionsig);
+				printf("%d %d\n",posnac.x,posnac.y);
 			}
+			*/
 			
 		}
-	}
+	//}
 	
-	//CICLO SEMAFORICO
+	CRUCE_fin();
 	
-
-	CRUCE_pon_semAforo(SEM_C1,VERDE);
-	CRUCE_pon_semAforo(SEM_P2,VERDE);
-	CRUCE_pon_semAforo(SEM_C2,ROJO);
-	CRUCE_pon_semAforo(SEM_P1,ROJO);
-	
-	
+	signal(SIGINT,sig_action);
 	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
 	while(1) {
 
@@ -121,21 +174,16 @@ void crearHijo();
 		//5.3
 	}
 		
-	CRUCE_fin();
+
 		
 	//6. CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
  	//Liberamos IPCS
-	shmdt(&mc);//Desasociacion
-	if(shmctl(memid,IPC_RMID,NULL)==-1){
-		fprintf(stderr,"Error Liberar Memoria Compartida");
-	}
-	if(semctl(sem, 0, IPC_RMID) == -1){
-	 	fprintf(stderr,"Error semctl\n"); 
-	}
+ 	
+ 	
  } 
  
 
- void crearHijo() {
+ void crearHijo(){
  	pid_t pid = fork();
  	
  	switch(pid) {
