@@ -37,11 +37,12 @@ void sig_action (int signal) {
 			fprintf(stderr,"Error Liberar Memoria Compartida");
 		}
 		if(semctl(sem, 0, IPC_RMID) == -1){
-	 		fprintf(stderr,"Error semctl\n"); 
+	 		fprintf(stsderr,"Error semctl\n"); 
 		}
 		exit(0);
 	}
 }
+
 void waitf(int numsem,int numwait){
 	sops[numsem].sem_num = 0;
 	sops[numsem].sem_op = -numwait; //Wait
@@ -71,28 +72,32 @@ void signalf(int numsem,int numsignal){
 	int velocidad = atoi(argv[2]);
 	//2. INICIALIZAR VARIABLES, MECANISMOS IPC, HANDLERS DE SENALES...
 	
-
-	if((sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); };
-	
+	if((sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
-	if (semctl(sem, 0, SETVAL, 1) == -1) { printf("Error semctl\n"); }
+
+	if (semctl(sem, 0, SETVAL, 1) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 	
-	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { printf("Error memid\n"); exit (-3); };
+	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { printf("Error memid\n"); exit (-3); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
-	mc = shmat(memid, NULL, 0);//Asociamos
+	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
+
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
+
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
 	struct posiciOn posicionsig,posnac,posicionsigsig;
+
 	posnac.x=0;
 	posnac.y=0;
+
 	posicionsigsig.x=0;
 	posicionsigsig.y=0;
 	
 	//CICLO SEMAFORICO
+
 	/*if(getpid()==PPADRE){
 		crearHijo();
 		while(1){
@@ -108,33 +113,37 @@ void signalf(int numsem,int numsignal){
 	
 	}
 	*/
+
 	//while(1){
 		if(getpid() == PPADRE) {
-			int tipo=CRUCE_nuevo_proceso();
+			int tipo = CRUCE_nuevo_proceso();
 			
 			waitf(0,1);
-			if(semop(sem,sops,1)==-1){
+			if(semop(sem,sops,1) == -1){
 				printf("Error semop\n");
 			}
 
-			
-			
+		
 			signalf(0,1);
-			if(semop(sem,sops,1)==-1){
+
+			if(semop(sem,sops,1) == -1){
 				printf("Error semop\n");
 			}
 			
 			while(posicionsigsig.y>=0){
 				sleep(2);
-				posicionsig=CRUCE_inicio_peatOn_ext(&posnac);
-				printf("%d %d\t",posnac.x,posnac.y);
+				posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
+
+				printf("%d %d\t", posnac.x, posnac.y);
 				sleep(3);
-				printf("%d %d\t",posicionsig.x,posicionsig.y);
+				printf("%d %d\t", posicionsig.x, posicionsig.y);
+
 				//semaforo para entrar a la siguiente posicion
-				
-				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
-				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
+				posicionsigsig = CRUCE_avanzar_peatOn(posicionsig);
+
+				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
 			}
+
 			sleep(3);
 			CRUCE_fin_peatOn();
 			
@@ -163,9 +172,10 @@ void signalf(int numsem,int numsignal){
 		}
 	//}
 	
-	CRUCE_fin();
 	
 	signal(SIGINT,sig_action);
+
+
 	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
 	while(1) {
 
@@ -174,12 +184,13 @@ void signalf(int numsem,int numsignal){
 		//5.3
 	}
 		
-
+	if(getpid() == PPADRE) {
+		CRUCE_fin();
+	} 
 		
 	//6. CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
  	//Liberamos IPCS
- 	
- 	
+
  } 
  
 
