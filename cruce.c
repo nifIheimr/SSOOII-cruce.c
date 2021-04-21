@@ -83,7 +83,7 @@ void cicloSem();
 	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
 
-	if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
+	
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 	
@@ -120,17 +120,17 @@ void cicloSem();
 	
 	while(1){
 		if(getpid() == PPADRE) {
-			
+			if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 			int tipo = CRUCE_nuevo_proceso();
-			
-			waitf(0,1);
+			int valor=semctl(sem, 0, GETVAL);
+			printf("Valor del Semaforo: %d\n",valor);//no sale el valor correcto cuando se ejecuta la funcion CRUCE_INICIO¿¿??
+			/*waitf(0,1);
 			signalf(0,1);
 			if(semop(sem,&sopsEntrar,1) == -1){
 				printf("Error semop\n");
 			}
+			*/
 			
-			int valor=semctl(sem, 0, GETVAL);
-			printf("Valor del Semaforo: %d\n",valor);//no sale el valor correcto cuando se ejecuta la funcion CRUCE_INICIO¿¿??
 
 				sleep(2);
 				posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
@@ -143,7 +143,6 @@ void cicloSem();
 			while(posicionsigsig.y>=0){
 				//semaforo para entrar a la siguiente posicion
 				posicionsigsig = CRUCE_avanzar_peatOn(posprueba);
-				
 				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
 			}
 
@@ -199,8 +198,8 @@ void cicloSem();
  } 
  void cicloSem(){
  	while(1){
- 		if (semctl(sem, 0, SETVAL, 0) == -1) { printf("Error semctl\n"); }
- 	
+ 		if (semctl(sem, 4, SETVAL, 3) == -1) { printf("Error semctl\n"); }
+ 		
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
 		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
