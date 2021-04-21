@@ -37,7 +37,7 @@ void sig_action (int signal) {
 			fprintf(stderr,"Error Liberar Memoria Compartida");
 		}
 		if(semctl(sem, 0, IPC_RMID) == -1){
-	 		fprintf(stsderr,"Error semctl\n"); 
+	 		fprintf(stderr,"Error semctl\n"); 
 		}
 		exit(0);
 	}
@@ -54,16 +54,25 @@ void signalf(int numsem,int numsignal){
 	sops[numsem].sem_flg = 0;
 }
 
- void crearHijo();
-
+void crearHijo();
+void cicloSem();
 //PRUEBA DE PUSH
 
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
  	pid_t HIJOCICLOS;
  	int i;
+ 	struct sigaction manejadora;
  	
- 	
+ 	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
+ 	//Liberamos IPCS
+ 	manejadora.sa_handler = sig_action;
+       if (sigemptyset(&manejadora.sa_mask) != 0) return 0;
+       if (sigaddset(&manejadora.sa_mask, SIGINT) != 0) return 0;
+       manejadora.sa_flags = 0;
+       if (sigaction(SIGINT, &manejadora, NULL) != 0) return 0;
+       
+       
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
 	if(argc < 3 || argc > 3) { exit(-1); } 
 	//if(argv[1] > MAXPROC) { exit(-2); } 
@@ -75,7 +84,7 @@ void signalf(int numsem,int numsignal){
 	if((sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
 
-	if (semctl(sem, 0, SETVAL, 1) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
+	if (semctl(sem, 0, SETVAL, nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 	
@@ -88,7 +97,7 @@ void signalf(int numsem,int numsignal){
 
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
-	struct posiciOn posicionsig,posnac,posicionsigsig;
+	struct posiciOn posicionsig,posnac,posicionsigsig,posprueba;
 
 	posnac.x=0;
 	posnac.y=0;
@@ -96,51 +105,43 @@ void signalf(int numsem,int numsignal){
 	posicionsigsig.x=0;
 	posicionsigsig.y=0;
 	
+	posprueba.x=0;
+	posprueba.y=0;
+	
 	//CICLO SEMAFORICO
 
-	/*if(getpid()==PPADRE){
+	if(getpid()==PPADRE){
 		crearHijo();
-		while(1){
-			CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
-			CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
-			CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
-			CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
-			for(int j=0;j<6;j++){
-				pausa();
-			}
-			
+		if(getpid()!=PPADRE){
+			cicloSem();
+		
 		}
 	
 	}
-	*/
 
 	//while(1){
 		if(getpid() == PPADRE) {
+			
 			int tipo = CRUCE_nuevo_proceso();
 			
 			waitf(0,1);
-			if(semop(sem,sops,1) == -1){
+			/*if(semop(sem,sops,1) == -1){
 				printf("Error semop\n");
 			}
-
-		
-			signalf(0,1);
-
-			if(semop(sem,sops,1) == -1){
-				printf("Error semop\n");
-			}
+*/
 			
-			while(posicionsigsig.y>=0){
 				sleep(2);
 				posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
 
 				printf("%d %d\t", posnac.x, posnac.y);
 				sleep(3);
 				printf("%d %d\t", posicionsig.x, posicionsig.y);
-
-				//semaforo para entrar a la siguiente posicion
 				posicionsigsig = CRUCE_avanzar_peatOn(posicionsig);
-
+				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
+			while(posicionsigsig.y>=0){
+				//semaforo para entrar a la siguiente posicion
+				posicionsigsig = CRUCE_avanzar_peatOn(posprueba);
+				
 				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
 			}
 
@@ -148,7 +149,11 @@ void signalf(int numsem,int numsignal){
 			CRUCE_fin_peatOn();
 			
 			
-			
+			signalf(0,1);
+
+			if(semop(sem,sops,1) == -1){
+				printf("Error semop\n");
+			}
 			/*while(posicionsigsig.y>=0){
 				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
 				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
@@ -171,10 +176,8 @@ void signalf(int numsem,int numsignal){
 			
 		}
 	//}
-	
-	
-	signal(SIGINT,sig_action);
 
+	
 
 	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
 	while(1) {
@@ -188,12 +191,45 @@ void signalf(int numsem,int numsignal){
 		CRUCE_fin();
 	} 
 		
-	//6. CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
- 	//Liberamos IPCS
+	
+ 	
 
  } 
- 
-
+ void cicloSem(){
+ 	while(1){
+		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
+		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
+		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
+		for(int j=0;j<6;j++){
+			pausa();
+		}
+		//SEM_C1 A AMARILLO
+		CRUCE_pon_semAforo(0,3);//SEM_C1 A AMARILLO
+		pausa();
+		pausa();
+		
+		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
+		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
+		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO			
+		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
+		for(int j=0;j<9;j++){
+			pausa();
+		}
+		//SEM_C2 A AMARILLO
+		CRUCE_pon_semAforo(1,3);//SEM_C2 A AMARILLO
+		pausa();
+		pausa();
+		
+		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
+		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
+		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
+		for(int j=0;j<12;j++){
+			pausa();
+		}	
+	}
+}
  void crearHijo(){
  	pid_t pid = fork();
  	
