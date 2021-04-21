@@ -19,14 +19,13 @@
 
 #define TRUE    1
 #define FALSE   0
-#define MAXPROC 10
 #define NSEMAFOROS 4
 #define TAMMC 256
 
 int sem;
 char *mc =  NULL;
 int memid;
-struct sembuf sops[4];
+struct sembuf sopsEntrar,sopsSalir;
 
 void sig_action (int signal) {
 	if(signal == SIGINT) {
@@ -44,14 +43,14 @@ void sig_action (int signal) {
 }
 
 void waitf(int numsem,int numwait){
-	sops[numsem].sem_num = 0;
-	sops[numsem].sem_op = -numwait; //Wait
-	sops[numsem].sem_flg = 0;
+	sopsEntrar.sem_num = numsem;
+	sopsEntrar.sem_op = -numwait; //Wait
+	sopsEntrar.sem_flg = 0;
 }
 void signalf(int numsem,int numsignal){
-	sops[numsem].sem_num = 0;
-	sops[numsem].sem_op = numsignal; //signal
-	sops[numsem].sem_flg = 0;
+	sopsSalir.sem_num = numsem;
+	sopsSalir.sem_op = numsignal; //signal
+	sopsSalir.sem_flg = 0;
 }
 
 void crearHijo();
@@ -81,10 +80,10 @@ void cicloSem();
 	int velocidad = atoi(argv[2]);
 	//2. INICIALIZAR VARIABLES, MECANISMOS IPC, HANDLERS DE SENALES...
 	
-	if((sem = semget(IPC_PRIVATE, 4, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
+	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
 
-	if (semctl(sem, 0, SETVAL, nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
+	if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna el valor 1 al semaforo 1 del array de semaforos
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 	
@@ -118,18 +117,21 @@ void cicloSem();
 		}
 	
 	}
-
-	//while(1){
+	
+	while(1){
 		if(getpid() == PPADRE) {
 			
 			int tipo = CRUCE_nuevo_proceso();
 			
 			waitf(0,1);
-			/*if(semop(sem,sops,1) == -1){
+			signalf(0,1);
+			if(semop(sem,&sopsEntrar,1) == -1){
 				printf("Error semop\n");
 			}
-*/
 			
+			int valor=semctl(sem, 0, GETVAL);
+			printf("Valor del Semaforo: %d\n",valor);//no sale el valor correcto cuando se ejecuta la funcion CRUCE_INICIO¿¿??
+
 				sleep(2);
 				posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
 
@@ -149,9 +151,9 @@ void cicloSem();
 			CRUCE_fin_peatOn();
 			
 			
-			signalf(0,1);
+			
 
-			if(semop(sem,sops,1) == -1){
+			if(semop(sem,&sopsSalir,1) == -1){
 				printf("Error semop\n");
 			}
 			/*while(posicionsigsig.y>=0){
@@ -175,7 +177,7 @@ void cicloSem();
 			*/
 			
 		}
-	//}
+	}
 
 	
 
