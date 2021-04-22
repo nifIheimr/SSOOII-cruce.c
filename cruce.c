@@ -112,46 +112,50 @@ void cicloSem();
 	if(getpid()==PPADRE){
 		crearHijo();
 		if(getpid()!=PPADRE){
-			cicloSem();
+			//cicloSem();
 		
 		}
 	
 	}
-	
-	while(1){
+	if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+	//while(1){
 		if(getpid() == PPADRE) {
-			if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 			int tipo = CRUCE_nuevo_proceso();
-			int valor=semctl(sem, 0, GETVAL);
-			printf("Valor del Semaforo: %d\n",valor);//no sale el valor correcto cuando se ejecuta la funcion CRUCE_INICIO¿¿??
-			/*waitf(0,1);
+			/*int valor=semctl(sem, 0, GETVAL);
+			printf("Valor del Semaforo: %d",valor);*/
+			
+			waitf(0,1);
 			signalf(0,1);
 			if(semop(sem,&sopsEntrar,1) == -1){
 				printf("Error semop\n");
-			}
-			*/
+			}		
+			sleep(2);
 			
-
-				sleep(2);
-				posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
-
-				printf("%d %d\t", posnac.x, posnac.y);
-				sleep(3);
-				printf("%d %d\t", posicionsig.x, posicionsig.y);
-				posicionsigsig = CRUCE_avanzar_peatOn(posicionsig);
+			posicionsig=CRUCE_inicio_coche();
+			sleep(3);
+			printf("%d %d\n",posicionsig.x,posicionsig.y);
+			posicionsigsig=CRUCE_avanzar_coche(posicionsig);
+			printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
+			posicionsigsig=CRUCE_avanzar_coche(posicionsigsig);
+			/*while(posicionsigsig.y>=0){
+				//semaforo para entrar a la siguiente posicion
+				posicionsigsig = CRUCE_avanzar_coche(posicionsigsig);
 				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
+			}*/
+			/*posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
+			printf("%d %d\t", posnac.x, posnac.y);
+			sleep(3);
+			printf("%d %d\t", posicionsig.x, posicionsig.y);
+			posicionsigsig = CRUCE_avanzar_peatOn(posicionsig);
+			printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
 			while(posicionsigsig.y>=0){
 				//semaforo para entrar a la siguiente posicion
 				posicionsigsig = CRUCE_avanzar_peatOn(posprueba);
 				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
 			}
-
+			*/
 			sleep(3);
-			CRUCE_fin_peatOn();
-			
-			
-			
-
+			//CRUCE_fin_peatOn();
 			if(semop(sem,&sopsSalir,1) == -1){
 				printf("Error semop\n");
 			}
@@ -176,7 +180,7 @@ void cicloSem();
 			*/
 			
 		}
-	}
+	//}
 
 	
 
@@ -198,7 +202,8 @@ void cicloSem();
  } 
  void cicloSem(){
  	while(1){
- 		if (semctl(sem, 4, SETVAL, 3) == -1) { printf("Error semctl\n"); }
+ 	
+ 		if (semctl(sem, 4, SETVAL, 0) == -1) { printf("Error semctl\n"); }
  		
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
 		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
