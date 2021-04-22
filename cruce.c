@@ -19,7 +19,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define NSEMAFOROS 4
+#define NSEMAFOROS 5
 #define TAMMC 256
 
 int sem;
@@ -199,6 +199,8 @@ void cicloSem();
  } 
  void cicloSem(){
  	while(1){
+ 		if (semctl(sem, 0, SETVAL, 0) == -1) { printf("Error semctl\n"); }
+ 	
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
 		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
@@ -232,6 +234,9 @@ void cicloSem();
 		}	
 	}
 }
+
+//Mientras haya cambio de semaforos bloqueamos la entrada al cruce de todos los procesos
+
  void crearHijo(){
  	pid_t pid = fork();
  	
