@@ -27,10 +27,11 @@ int sem;
 char *mc =  NULL;
 int memid;
 struct sembuf sopsEntrar,sopsSalir;
+struct sigaction manejadora;
 
 void sig_action(int signal);
-void waitf();
-void signalf();
+void waitf(int,int);
+void signalf(int,int);
 
 void crearHijo();
 void cicloSem();
@@ -47,7 +48,7 @@ void cruce();
  	pid_t PPADRE = getpid();
  	pid_t HIJOCICLOS;
  	int i;
- 	struct sigaction manejadora;
+ 	
 	struct sembuf sops[10];
  	
  	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
@@ -55,7 +56,7 @@ void cruce();
  	manejadora.sa_handler = sig_action;
     if (sigemptyset(&manejadora.sa_mask) != 0) return 0;
     if (sigaddset(&manejadora.sa_mask, SIGINT) != 0) return 0;
-    manejadora.sa_flags = 0;
+    	manejadora.sa_flags = 0;
     if (sigaction(SIGINT, &manejadora, NULL) != 0) return 0;
        
        
@@ -71,7 +72,8 @@ void cruce();
 	
 	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
-
+	
+	
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 
@@ -86,109 +88,51 @@ void cruce();
 	
 	//CICLO SEMAFORICO
 
-	if(getpid() == PPADRE){
+	/*if(getpid() == PPADRE){
 		crearHijo();
 
 		if(getpid() != PPADRE){
 			cicloSem();
 		}
 	
-	}
+	}*/
 
 	if(semctl(sem, 0, SETVAL, nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
-
+	
 	while(1) {
 		if(getpid() == PPADRE) {
 			int tipo;
-
+			
 			tipo = CRUCE_nuevo_proceso();
-
-			/*int valor=semctl(sem, 0, GETVAL);*/
-
+			
 			waitf(0,1);
 			signalf(0,1);
 
 			if(semop(sem, &sopsEntrar, 1) == -1){
 				printf("Error semop\n");
 			}
+			switch(tipo) {
+				case 0: iniciarCoches();
+				break;
 
-			if(getpid() != PPADRE) { 
+				case 1:iniciarPeatones();
+				break;
 
-				switch(tipo) {
-					case 1: iniciarCoches();
-					break;
-
-					case 0:	//iniciarPeatones();
-					break;
-
-					default: perror("ERROR SWITCH"); exit(-2);
-				}
-
+				default: perror("ERROR SWITCH"); exit(-2);
 			}
-
-			//fprintf(stderr, "%d %d\t",posicionsig.x,posicionsig.y);
-
-
-			/*while(posicionsigsig.y>=0){
-				//semaforo para entrar a la siguiente posicion
-				posicionsigsig = CRUCE_avanzar_coche(posicionsigsig);
-				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
-			}*/
-			/*posicionsig = CRUCE_inicio_peatOn_ext(&posnac);
-			printf("%d %d\t", posnac.x, posnac.y);
-			sleep(3);
-			printf("%d %d\t", posicionsig.x, posicionsig.y);
-			posicionsigsig = CRUCE_avanzar_peatOn(posicionsig);
-			printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
-			while(posicionsigsig.y>=0){
-				//semaforo para entrar a la siguiente posicion
-				posicionsigsig = CRUCE_avanzar_peatOn(posprueba);
-				printf("%d %d\t", posicionsigsig.x, posicionsigsig.y);
-			}
-			*/
-			sleep(3);
-			//CRUCE_fin_peatOn();
 
 			if(semop(sem, &sopsSalir, 1) == -1) {
 				printf("Error semop\n");
-			}
-			
-			/*while(posicionsigsig.y>=0){
-				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
-				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
-				pausa();
-			}*/
-			/*if(tipo==0){
-				posicionsig=CRUCE_inicio_coche();
-				printf("%d %d\n",posicionsig.x,posicionsig.y);
-				CRUCE_avanzar_coche(posicionsig);
-				
-			}else{
-				printf("%d %d\t",posnac.x,posnac.y);
-				posicionsig=CRUCE_inicio_peatOn_ext(&posnac);
-				printf("%d %d\t",posnac.x,posnac.y);
-				printf("%d %d\t",posicionsig.x,posicionsig.y);
-				posnac=CRUCE_avanzar_peatOn(posicionsig);
-				printf("%d %d\n",posnac.x,posnac.y);
-			}
-			*/
-			
+			}	
 		}
 	}
 
 	
-
-	//5. ENTRA EN EL BUCLE INFINITO DEL QUE SOLO SE SALDRA CON UNA INTERRUPCION
-	while(1) {
-
-		//5.1
-		//5.2
-		//5.3
-	}
 		
 	if(getpid() == PPADRE) {
 		CRUCE_fin();
-	} 
+	}
+	 
 		
 	
  	
@@ -280,6 +224,8 @@ void sig_action (int signal) {
 		if(semctl(sem, 0, IPC_RMID) == -1){
 	 		fprintf(stderr,"Error semctl\n"); 
 		}
+		CRUCE_fin();
+		//system("clear");
 		exit(0);
 	}
 }
@@ -312,6 +258,32 @@ void iniciarCoches() {
 
 		pausa_coche();
 	}
+	CRUCE_fin_coche();
+	
+
+}
+
+void iniciarPeatones() {
+	struct posiciOn posSig, posSigSig, posNac;
+	
+	posNac.x=0;
+	posNac.y=0;
+	
+	posSigSig.x=0;
+	posSigSig.y=0;
+	
+	posSig = CRUCE_inicio_peatOn_ext(&posNac);
+
+	posSigSig = CRUCE_avanzar_peatOn(posSig);
+
+	while(posSigSig.y >= 0) {
+		
+		fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
+		posSigSig = CRUCE_avanzar_peatOn(posSigSig);
+
+		pausa();
+	}
+	CRUCE_fin_peatOn();
 	
 
 }
