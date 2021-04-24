@@ -28,36 +28,18 @@ char *mc =  NULL;
 int memid;
 struct sembuf sopsEntrar,sopsSalir;
 
-void sig_action (int signal) {
-	if(signal == SIGINT) {
-		printf("\nInterrupción\n");
-		
-		shmdt(&mc);//Desasociacion
-		if(shmctl(memid,IPC_RMID,NULL)==-1){
-			fprintf(stderr,"Error Liberar Memoria Compartida");
-		}
-		if(semctl(sem, 0, IPC_RMID) == -1){
-	 		fprintf(stderr,"Error semctl\n"); 
-		}
-		exit(0);
-	}
-}
-
-void waitf(int numsem,int numwait){
-	sopsEntrar.sem_num = numsem;
-	sopsEntrar.sem_op = -numwait; //Wait
-	sopsEntrar.sem_flg = 0;
-}
-void signalf(int numsem,int numsignal){
-	sopsSalir.sem_num = numsem;
-	sopsSalir.sem_op = numsignal; //signal
-	sopsSalir.sem_flg = 0;
-}
+void sig_action(int signal);
+void waitf();
+void signalf();
 
 void crearHijo();
 void cicloSem();
-void cruce();
+
 void nPausas(int n);
+
+void iniciarPeatones();
+void iniciarCoches();
+void cruce();
 
 //PRUEBA DE PUSH
 
@@ -102,48 +84,50 @@ void nPausas(int n);
 
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	
-	struct posiciOn posicionsig,posnac,posicionsigsig,posprueba;
-
-	posnac.x=0;
-	posnac.y=0;
-
-	posicionsigsig.x=0;
-	posicionsigsig.y=0;
-	
-	posprueba.x=0;
-	posprueba.y=0;
-	
 	//CICLO SEMAFORICO
 
-	if(getpid()==PPADRE){
+	if(getpid() == PPADRE){
 		crearHijo();
-		if(getpid()!=PPADRE){
+
+		if(getpid() != PPADRE){
 			cicloSem();
-		
 		}
 	
 	}
 
-	if (semctl(sem, 0, SETVAL,nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
-	while(1){
+	if(semctl(sem, 0, SETVAL, nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+
+	while(1) {
 		if(getpid() == PPADRE) {
-			int tipo = CRUCE_nuevo_proceso();
-			/*int valor=semctl(sem, 0, GETVAL);
-			printf("Valor del Semaforo: %d",valor);*/
-			
+			int tipo;
+
+			tipo = CRUCE_nuevo_proceso();
+
+			/*int valor=semctl(sem, 0, GETVAL);*/
+
 			waitf(0,1);
 			signalf(0,1);
-			if(semop(sem,&sopsEntrar,1) == -1){
+
+			if(semop(sem, &sopsEntrar, 1) == -1){
 				printf("Error semop\n");
-			}		
-			sleep(2);
-			
-			posicionsig=CRUCE_inicio_coche();
-			sleep(3);
+			}
+
+			if(getpid() != PPADRE) { 
+
+				switch(tipo) {
+					case 1: iniciarCoches();
+					break;
+
+					case 0:	//iniciarPeatones();
+					break;
+
+					default: perror("ERROR SWITCH"); exit(-2);
+				}
+
+			}
+
 			//fprintf(stderr, "%d %d\t",posicionsig.x,posicionsig.y);
-			posicionsigsig=CRUCE_avanzar_coche(posicionsig);
-			fprintf(stderr, "%d %d\t", posicionsigsig.x, posicionsigsig.y);
-			posicionsigsig=CRUCE_avanzar_coche(posicionsigsig);
+
 
 			/*while(posicionsigsig.y>=0){
 				//semaforo para entrar a la siguiente posicion
@@ -164,9 +148,11 @@ void nPausas(int n);
 			*/
 			sleep(3);
 			//CRUCE_fin_peatOn();
-			if(semop(sem,&sopsSalir,1) == -1){
+
+			if(semop(sem, &sopsSalir, 1) == -1) {
 				printf("Error semop\n");
 			}
+			
 			/*while(posicionsigsig.y>=0){
 				posicionsigsig=CRUCE_avanzar_peatOn(posicionsig);
 				printf("%d %d\t",posicionsigsig.x,posicionsigsig.y);
@@ -243,8 +229,8 @@ void nPausas(int n);
 
 		//SEM_C2 A AMARILLO
 		CRUCE_pon_semAforo(1,3);//SEM_C2 A AMARILLO
-		pausa();
-		pausa();
+
+		nPausas(2);
 		
 		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
@@ -279,5 +265,53 @@ void cruce() {
 void nPausas(int n) {
 	for(int j = 0; j < n; j++){
 			pausa();
+	}
+}
+
+
+void sig_action (int signal) {
+	if(signal == SIGINT) {
+		printf("\nInterrupción\n");
+		
+		shmdt(&mc);//Desasociacion
+		if(shmctl(memid,IPC_RMID,NULL)==-1){
+			fprintf(stderr,"Error Liberar Memoria Compartida");
 		}
+		if(semctl(sem, 0, IPC_RMID) == -1){
+	 		fprintf(stderr,"Error semctl\n"); 
+		}
+		exit(0);
+	}
+}
+
+void waitf(int numsem,int numwait) {
+	sopsEntrar.sem_num = numsem;
+	sopsEntrar.sem_op = -numwait; //Wait
+	sopsEntrar.sem_flg = 0;
+}
+void signalf(int numsem,int numsignal) {
+	sopsSalir.sem_num = numsem;
+	sopsSalir.sem_op = numsignal; //signal
+	sopsSalir.sem_flg = 0;
+}
+
+void iniciarCoches() {
+	struct posiciOn posSig, posSigSig, posPrueba;
+
+	posSigSig.x=0;
+	posSigSig.y=0;
+	
+	posSig = CRUCE_inicio_coche();
+
+	posSigSig = CRUCE_avanzar_coche(posSig);
+
+	while(posSigSig.y >= 0) {
+		
+		fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
+		posSigSig = CRUCE_avanzar_coche(posSigSig);
+
+		pausa_coche();
+	}
+	
+
 }
