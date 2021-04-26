@@ -64,20 +64,20 @@ void cruce();
 	if(argc < 3 || argc > 3) { exit(-1); } 
 	//if(argv[1] > MAXPROC) { exit(-2); } 
 
-	if(atoi(argv[1]) > MAXPROCESOS) { perror("ERROR: Demasiados procesos, desbordamiento"); exit(-1); } 
+	if(atoi(argv[1]) > MAXPROCESOS) { perror("ERROR: Demasiados procesos, desbordamiento"); exit(errno); } 
 	
 	int nproc = atoi(argv[1]);
 	int velocidad = atoi(argv[2]);
 	//2. INICIALIZAR VARIABLES, MECANISMOS IPC, HANDLERS DE SENALES...
 	
-	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { printf("Error semget\n"); }; //Iniciar semaforo
+	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { perror("Error semget"); exit(errno); }; //Iniciar semaforo
 	//1 = numero de procesos que entran a la vez
 	
 	
 	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
 	 
 
-	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { printf("Error memid\n"); exit (-3); }; //Creacion de memoria compartida (Min: 256 bytes)
+	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
 	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
 
@@ -97,7 +97,7 @@ void cruce();
 	
 	}*/
 
-	if(semctl(sem, 0, SETVAL, nproc) == -1) { printf("Error semctl\n"); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+	if(semctl(sem, 0, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	
 	while(1) {
 		if(getpid() == PPADRE) {
@@ -109,8 +109,10 @@ void cruce();
 			signalf(0,1);
 
 			if(semop(sem, &sopsEntrar, 1) == -1){
-				printf("Error semop\n");
+				perror("Error semop");
+				exit(errno);
 			}
+
 			switch(tipo) {
 				case 0: iniciarCoches();
 				break;
@@ -118,11 +120,12 @@ void cruce();
 				case 1:iniciarPeatones();
 				break;
 
-				default: perror("ERROR SWITCH"); exit(-2);
+				default: perror("ERROR SWITCH"); exit(errno);
 			}
 
 			if(semop(sem, &sopsSalir, 1) == -1) {
-				printf("Error semop\n");
+				perror("Error semop");
+				exit(errno);
 			}	
 		}
 	}
@@ -141,7 +144,7 @@ void cruce();
  void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
- 		if (semctl(sem, 4, SETVAL, 0) == -1) { printf("Error semctl\n"); }
+ 		if (semctl(sem, 4, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); }
 		 
  		waitf(4,1);
 
@@ -156,7 +159,7 @@ void cruce();
 
 
 		//SEM_C1 A AMARILLO
-		if (semctl(sem, 4, SETVAL, 0) == -1) { printf("Error semctl\n"); }
+		if (semctl(sem, 4, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); }
 
 		cruce();
 		
@@ -201,13 +204,14 @@ void cruce() {
  	switch(pid) {
  		case -1:
  			system("clear");
- 			perror("Error creando hijos\n");
- 			exit(-1);
+ 			perror("Error creando hijos");
+ 			exit(errno);
  	}
  } 
 
 void nPausas(int n) {
-	for(int j = 0; j < n; j++){
+	int j;
+	for(j = 0; j < n; j++){
 			pausa();
 	}
 }
@@ -217,12 +221,14 @@ void sig_action (int signal) {
 	if(signal == SIGINT) {
 		printf("\nInterrupción\n");
 		
-		shmdt(&mc);//Desasociacion
+		shmdt(mc);//Desasociacion
 		if(shmctl(memid,IPC_RMID,NULL)==-1){
-			fprintf(stderr,"Error Liberar Memoria Compartida");
+			perror("Error Liberar Memoria Compartida");
+			exit(errno);
 		}
 		if(semctl(sem, 0, IPC_RMID) == -1){
-	 		fprintf(stderr,"Error semctl\n"); 
+	 		perror("Error semctl"); 
+			exit(errno);
 		}
 		CRUCE_fin();
 		//system("clear");
