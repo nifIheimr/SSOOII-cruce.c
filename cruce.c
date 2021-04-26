@@ -97,7 +97,7 @@ void cruce();
 		crearHijo();
 
 		if(getpid() != PPADRE){
-			//cicloSem();
+			cicloSem();
 		}
 	
 	}
