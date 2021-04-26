@@ -24,8 +24,9 @@
 #define MAXPROCESOS 127
 
 int sem;
-char *mc =  NULL;
+void *mc =  NULL;
 int memid;
+
 struct sembuf sopsEntrar,sopsSalir;
 struct sigaction manejadora;
 
@@ -41,6 +42,13 @@ void nPausas(int n);
 void iniciarPeatones();
 void iniciarCoches();
 void cruce();
+
+
+union semun {
+	int val;
+    struct semid_ds *buf;
+    ushort_t *array;
+};
 
 //PRUEBA DE PUSH
 
@@ -79,7 +87,7 @@ void cruce();
 
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
-	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
+	mc = shmat(memid, 0, 0); //Asociamos el puntero que devuelve shmat a una variable 
 
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -88,14 +96,14 @@ void cruce();
 	
 	//CICLO SEMAFORICO
 
-	/*if(getpid() == PPADRE){
+	if(getpid() == PPADRE){
 		crearHijo();
 
 		if(getpid() != PPADRE){
 			cicloSem();
 		}
 	
-	}*/
+	}
 
 	if(semctl(sem, 0, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	
