@@ -44,11 +44,11 @@ void iniciarCoches();
 void cruce();
 
 
-union semun {
+/*union semun {
 	int val;
     	struct semid_ds *buf;
     	ushort_t *array;
-};
+};*/
 
 //PRUEBA DE PUSH
 
@@ -97,7 +97,7 @@ union semun {
 		crearHijo();
 
 		if(getpid() != PPADRE){
-			cicloSem();
+			//cicloSem();
 		}
 	
 	}
@@ -105,14 +105,20 @@ union semun {
 	if(semctl(sem, 0, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	
 	while(1) {
+		int retorno;
 		if(getpid() == PPADRE) {
 			int tipo;
-			
-			tipo = CRUCE_nuevo_proceso();
-			
 			waitf(0,1);
-
-			switch(tipo) {
+			tipo = CRUCE_nuevo_proceso();
+			crearHijo();
+				
+		}
+		if(getpid()!=PPADRE){
+			
+			
+			iniciarCoches();
+			
+			/*switch(tipo) {
 				case 0: iniciarCoches();
 				break;
 
@@ -120,11 +126,17 @@ union semun {
 				break;
 
 				default: perror("ERROR SWITCH"); exit(errno);
-			}
-			signalf(0,1);
-
-				
+			}*/
+			
+			
+			
 		}
+		/*if(getpid()==PPADRE){
+			if(wait(&retorno)==-1){
+					perror("wait");
+			}
+		}*/
+		
 	}
 
 	
@@ -141,7 +153,7 @@ union semun {
  void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
- 		if (semctl(sem, 4, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); }
+ 		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
 		 
  		waitf(4,1);
 
@@ -156,9 +168,9 @@ union semun {
 
 
 		//SEM_C1 A AMARILLO
-		if (semctl(sem, 4, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); }
+		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
 
-		cruce();
+		cruce(0,3);
 		
 		waitf(4,1);
 
@@ -170,9 +182,10 @@ union semun {
 		nPausas(9);
 
 		signalf(4,1);
-
+		
 		//SEM_C2 A AMARILLO
-		CRUCE_pon_semAforo(1,3);//SEM_C2 A AMARILLO
+		cruce(1,3);
+
 
 		nPausas(2);
 		
@@ -187,8 +200,8 @@ union semun {
 	}
 }
 
-void cruce() {
-	CRUCE_pon_semAforo(0,3);//SEM_C1 A AMARILLO
+void cruce(int sem,int color) {
+	CRUCE_pon_semAforo(sem,color);//SEM A AMARILLO
 	pausa();
 	pausa();
 }
@@ -221,8 +234,7 @@ void sig_action (int signal) {
 		
 		/*if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
 			perror("wait");
-		}
-		*/
+		}*/
 		shmdt(&mc);//Desasociacion
 		if(shmctl(memid,IPC_RMID,NULL)==-1){
 			perror("Error Liberar Memoria Compartida");
@@ -266,15 +278,18 @@ void iniciarCoches() {
 	posSig = CRUCE_inicio_coche();
 
 	posSigSig = CRUCE_avanzar_coche(posSig);
-
+	
 	while(posSigSig.y >= 0) {
 		
-		fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
+		//fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
 		posSigSig = CRUCE_avanzar_coche(posSigSig);
 
 		pausa_coche();
 	}
 	CRUCE_fin_coche();
+	signalf(0,1);
+	SIGTERM;//Aqui debe de morir el proceso
+	
 	
 
 }
@@ -294,7 +309,7 @@ void iniciarPeatones() {
 
 	while(posSigSig.y >= 0) {
 		
-		fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
+		//fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
 		posSigSig = CRUCE_avanzar_peatOn(posSigSig);
 
 		pausa();
