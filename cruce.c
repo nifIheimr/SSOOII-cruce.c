@@ -46,8 +46,8 @@ void cruce();
 
 union semun {
 	int val;
-    struct semid_ds *buf;
-    ushort_t *array;
+    	struct semid_ds *buf;
+    	ushort_t *array;
 };
 
 //PRUEBA DE PUSH
@@ -62,10 +62,10 @@ union semun {
  	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
  	//Liberamos IPCS
  	manejadora.sa_handler = sig_action;
-    if (sigemptyset(&manejadora.sa_mask) != 0) return 0;
-    if (sigaddset(&manejadora.sa_mask, SIGINT) != 0) return 0;
+    	if (sigemptyset(&manejadora.sa_mask) != 0) return 0;
+    	if (sigaddset(&manejadora.sa_mask, SIGINT) != 0) return 0;
     	manejadora.sa_flags = 0;
-    if (sigaction(SIGINT, &manejadora, NULL) != 0) return 0;
+    	if (sigaction(SIGINT, &manejadora, NULL) != 0) return 0;
        
        
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
@@ -76,18 +76,15 @@ union semun {
 	
 	int nproc = atoi(argv[1]);
 	int velocidad = atoi(argv[2]);
+	
 	//2. INICIALIZAR VARIABLES, MECANISMOS IPC, HANDLERS DE SENALES...
 	
 	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { perror("Error semget"); exit(errno); }; //Iniciar semaforo
-	//1 = numero de procesos que entran a la vez
 	
-	
-	//if (semctl(sem, 1, SETVAL, 0) == -1) { printf("Error semctl\n"); }
-	 
 
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
-	mc = shmat(memid, 0, 0); //Asociamos el puntero que devuelve shmat a una variable 
+	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
 
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -114,12 +111,6 @@ union semun {
 			tipo = CRUCE_nuevo_proceso();
 			
 			waitf(0,1);
-			signalf(0,1);
-
-			if(semop(sem, &sopsEntrar, 1) == -1){
-				perror("Error semop");
-				exit(errno);
-			}
 
 			switch(tipo) {
 				case 0: iniciarCoches();
@@ -130,11 +121,9 @@ union semun {
 
 				default: perror("ERROR SWITCH"); exit(errno);
 			}
+			signalf(0,1);
 
-			if(semop(sem, &sopsSalir, 1) == -1) {
-				perror("Error semop");
-				exit(errno);
-			}	
+				
 		}
 	}
 
@@ -220,16 +209,21 @@ void cruce() {
 void nPausas(int n) {
 	int j;
 	for(j = 0; j < n; j++){
-			pausa();
+		pausa();
 	}
 }
 
 
 void sig_action (int signal) {
+	int retorno;
 	if(signal == SIGINT) {
 		printf("\nInterrupción\n");
 		
-		shmdt(mc);//Desasociacion
+		/*if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
+			perror("wait");
+		}
+		*/
+		shmdt(&mc);//Desasociacion
 		if(shmctl(memid,IPC_RMID,NULL)==-1){
 			perror("Error Liberar Memoria Compartida");
 			exit(errno);
@@ -248,11 +242,19 @@ void waitf(int numsem,int numwait) {
 	sopsEntrar.sem_num = numsem;
 	sopsEntrar.sem_op = -numwait; //Wait
 	sopsEntrar.sem_flg = 0;
+	if(semop(sem, &sopsEntrar, 1) == -1){
+		perror("Error semop");
+		exit(errno);
+	}
 }
 void signalf(int numsem,int numsignal) {
 	sopsSalir.sem_num = numsem;
 	sopsSalir.sem_op = numsignal; //signal
 	sopsSalir.sem_flg = 0;
+	if(semop(sem, &sopsSalir, 1) == -1) {
+		perror("Error semop");
+		exit(errno);
+	}
 }
 
 void iniciarCoches() {
