@@ -19,7 +19,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define NSEMAFOROS 6
+#define NSEMAFOROS 7
 #define TAMMC 256
 #define MAXPROCESOS 127
 
@@ -97,56 +97,45 @@ void cruce();
 		crearHijo();
 
 		if(getpid() != PPADRE){
-			cicloSem();
+			//cicloSem();
 		}
 	
 	}
 
-	if(semctl(sem, 0, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
-	
+	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
 	while(1) {
 		int retorno;
 		if(getpid() == PPADRE) {
 			int tipo;
-			waitf(5,1);
+			
 			tipo = CRUCE_nuevo_proceso();
 			crearHijo();
+
+			if(getpid()!=PPADRE){
+				waitf(5,1);
+				iniciarCoches();
+				/*switch(tipo) {
+					case 0: iniciarCoches();
+					break;
+
+					case 1:iniciarPeatones();
+					break;
+
+					default: perror("ERROR SWITCH"); exit(errno);
+				}*/
+				
+			}
 				
 		}
-		if(getpid()!=PPADRE){
-			
-			
-			iniciarCoches();
-			
-			/*switch(tipo) {
-				case 0: iniciarCoches();
-				break;
-
-				case 1:iniciarPeatones();
-				break;
-
-				default: perror("ERROR SWITCH"); exit(errno);
-			}*/
-			
-			
+		if(getpid()==PPADRE){
+			if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
+				perror("wait");
+			}
 			
 		}
-		/*if(getpid()==PPADRE){
-			if(wait(&retorno)==-1){
-					perror("wait");
-			}
-		}*/
 		
 	}
-
-	
-		
-	if(getpid() == PPADRE) {
-		CRUCE_fin();
-	}
-	 
-		
-	
  	
 
  } 
@@ -241,12 +230,16 @@ void nPausas(int n) {
 
 void limpiarIPCS(int signal) {
 	int retorno;
+	waitf(6,1);
+	int num=semctl(sem,6,GETVAL);
+	printf("VALOR DEL SEMAFORO %d\n",num);
 	if(signal == SIGINT) {
+		
 		printf("Interrupción\n");
 		
-		/*if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
+		if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
 			perror("wait");
-		}*/
+		}
 		shmdt(&mc);//Desasociacion
 		if(shmctl(memid,IPC_RMID,NULL)==-1){
 			perror("Error Liberar Memoria Compartida");
@@ -279,11 +272,11 @@ void signalf(int numsem,int numsignal) {
 		perror("Error semop");
 		exit(errno);
 	}
+	
 }
 
 void iniciarCoches() {
 	struct posiciOn posSig, posSigSig, posPrueba;
-
 	posSigSig.x=0;
 	posSigSig.y=0;
 	
@@ -292,15 +285,17 @@ void iniciarCoches() {
 	posSigSig = CRUCE_avanzar_coche(posSig);
 	
 	while(posSigSig.y >= 0) {
-		
 		//fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
 		posSigSig = CRUCE_avanzar_coche(posSigSig);
 
 		pausa_coche();
 	}
+	
 	CRUCE_fin_coche();
-	signalf(0,1);
-	SIGTERM;//Aqui debe de morir el proceso
+	signalf(5,1);
+	int num=semctl(sem,5,GETVAL);
+	printf("VALOR DEL SEMAFORO %d\n",num);
+	exit(0);
 	
 	
 
