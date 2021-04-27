@@ -19,7 +19,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define NSEMAFOROS 5
+#define NSEMAFOROS 6
 #define TAMMC 256
 #define MAXPROCESOS 127
 
@@ -28,9 +28,9 @@ void *mc =  NULL;
 int memid;
 
 struct sembuf sopsEntrar,sopsSalir;
-struct sigaction manejadora;
+struct sigaction sa;
 
-void sig_action(int signal);
+void limpiarIPCS(int signal);
 void waitf(int,int);
 void signalf(int,int);
 
@@ -61,11 +61,11 @@ void cruce();
  	
  	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
  	//Liberamos IPCS
- 	manejadora.sa_handler = sig_action;
-    	if (sigemptyset(&manejadora.sa_mask) != 0) return 0;
-    	if (sigaddset(&manejadora.sa_mask, SIGINT) != 0) return 0;
-    	manejadora.sa_flags = 0;
-    	if (sigaction(SIGINT, &manejadora, NULL) != 0) return 0;
+ 	sa.sa_handler = limpiarIPCS;
+    	if (sigemptyset(&sa.sa_mask) != 0) return 0;
+    	if (sigaddset(&sa.sa_mask, SIGINT) != 0) return 0;
+    	sa.sa_flags = 0;
+    	if (sigaction(SIGINT, &sa, NULL) != 0) return 0;
        
        
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
@@ -97,7 +97,7 @@ void cruce();
 		crearHijo();
 
 		if(getpid() != PPADRE){
-			//cicloSem();
+			cicloSem();
 		}
 	
 	}
@@ -108,7 +108,7 @@ void cruce();
 		int retorno;
 		if(getpid() == PPADRE) {
 			int tipo;
-			waitf(0,1);
+			waitf(5,1);
 			tipo = CRUCE_nuevo_proceso();
 			crearHijo();
 				
@@ -156,16 +156,19 @@ void cruce();
  		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
 		 
  		waitf(4,1);
+		
 
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
-		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
+		//signalf(0,1);
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+		//waitf(1,1);
 		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
-
+		//waitf(2,1);
+		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
+		//signalf(3,1);
+		
 		signalf(4,1);
-
 		nPausas(6);
-
 
 		//SEM_C1 A AMARILLO
 		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
@@ -174,10 +177,15 @@ void cruce();
 		
 		waitf(4,1);
 
-		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
-		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO			
+		//waitf(0,1);
+		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
+		//signalf(1,1);
 		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
+		//waitf(2,1);
+		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO		
+		//waitf(3,1);	
+		
 
 		nPausas(9);
 
@@ -188,11 +196,15 @@ void cruce();
 
 
 		nPausas(2);
-		
-		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
-		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
+		//waitf(0,1);
+		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+		//waitf(1,1);
+		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
+		//signalf(2,1);
 		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
+		//waitf(3,1);
 
 		nPausas(12);
 		
@@ -227,10 +239,10 @@ void nPausas(int n) {
 }
 
 
-void sig_action (int signal) {
+void limpiarIPCS(int signal) {
 	int retorno;
 	if(signal == SIGINT) {
-		printf("\nInterrupción\n");
+		printf("Interrupción\n");
 		
 		/*if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
 			perror("wait");
