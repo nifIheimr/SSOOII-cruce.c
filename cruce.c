@@ -61,7 +61,7 @@ void cruce();
  	
  	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
  	//Liberamos IPCS
- 	sa.sa_handler = limpiarIPCS;
+ 	sa.sa_handler = &limpiarIPCS;
     	if (sigemptyset(&sa.sa_mask) != 0) return 0;
     	if (sigaddset(&sa.sa_mask, SIGINT) != 0) return 0;
     	sa.sa_flags = 0;
@@ -104,13 +104,18 @@ void cruce();
 
 	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
+	/*int num=semctl(sem,5,GETVAL);
+	printf("VALOR DEL SEMAFORO %d\n",num);*/
 	while(1) {
-		int retorno;
 		if(getpid() == PPADRE) {
-			int tipo;
-			
-			tipo = CRUCE_nuevo_proceso();
-			crearHijo();
+			for(int i=0;i<nproc;i++){
+				if(getpid()==PPADRE){
+					CRUCE_nuevo_proceso();
+					crearHijo();
+				}else{
+					break;
+				}
+			}
 
 			if(getpid()!=PPADRE){
 				waitf(5,1);
@@ -126,16 +131,18 @@ void cruce();
 				}*/
 				
 			}
+			if(getpid()==PPADRE){
+				for(int i=0;i<nproc;i++){
+					if(wait(NULL)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
+						perror("wait");
+					}
+				
+				}
+			}
 				
 		}
-		if(getpid()==PPADRE){
-			if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
-				perror("wait");
-			}
-			
-		}
-		
 	}
+	
  	
 
  } 
@@ -229,17 +236,8 @@ void nPausas(int n) {
 
 
 void limpiarIPCS(int signal) {
-	int retorno;
-	waitf(6,1);
-	int num=semctl(sem,6,GETVAL);
-	printf("VALOR DEL SEMAFORO %d\n",num);
 	if(signal == SIGINT) {
-		
 		printf("Interrupción\n");
-		
-		if(wait(&retorno)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
-			perror("wait");
-		}
 		shmdt(&mc);//Desasociacion
 		if(shmctl(memid,IPC_RMID,NULL)==-1){
 			perror("Error Liberar Memoria Compartida");
@@ -250,8 +248,7 @@ void limpiarIPCS(int signal) {
 			exit(errno);
 		}
 		CRUCE_fin();
-		//system("clear");
-		exit(0);
+		//exit(0);
 	}
 }
 
@@ -293,10 +290,7 @@ void iniciarCoches() {
 	
 	CRUCE_fin_coche();
 	signalf(5,1);
-	int num=semctl(sem,5,GETVAL);
-	printf("VALOR DEL SEMAFORO %d\n",num);
 	exit(0);
-	
 	
 
 }
