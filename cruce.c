@@ -23,14 +23,10 @@
 #define TAMMC 256
 #define MAXPROCESOS 127
 
-int sem;
-void *mc =  NULL;
-int memid;
 
-struct sembuf sopsEntrar,sopsSalir;
-struct sigaction sa;
+static volatile sig_atomic_t ejecuta=1;
 
-void limpiarIPCS(int signal);
+void limpiarIPCS();
 void waitf(int,int);
 void signalf(int,int);
 
@@ -43,6 +39,14 @@ void iniciarPeatones();
 void iniciarCoches();
 void cruce();
 
+struct sembuf sopsEntrar,sopsSalir;
+struct sigaction sa;
+
+
+int sem;
+char *mc =  NULL;
+int memid;
+
 
 /*union semun {
 	int val;
@@ -50,17 +54,12 @@ void cruce();
     	ushort_t *array;
 };*/
 
-//PRUEBA DE PUSH
 
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
- 	pid_t HIJOCICLOS;
  	int i;
  	
-	struct sembuf sops[10];
- 	
- 	//CUANDO SE RECIBA UNA SIGINT SE FINALIZARA TODO DE FORMA ORDENADA
- 	//Liberamos IPCS
+ 	//MANEJADORAS CTRL+C
  	sa.sa_handler = &limpiarIPCS;
     	if (sigemptyset(&sa.sa_mask) != 0) return 0;
     	if (sigaddset(&sa.sa_mask, SIGINT) != 0) return 0;
@@ -70,8 +69,7 @@ void cruce();
        
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
 	if(argc < 3 || argc > 3) { exit(-1); } 
-	//if(argv[1] > MAXPROC) { exit(-2); } 
-
+	
 	if(atoi(argv[1]) > MAXPROCESOS) { perror("ERROR: Demasiados procesos, desbordamiento"); exit(errno); } 
 	
 	int nproc = atoi(argv[1]);
@@ -90,58 +88,50 @@ void cruce();
 	CRUCE_inicio(velocidad, nproc, sem, mc);
 
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
-	
-	//CICLO SEMAFORICO
-
 	if(getpid() == PPADRE){
-		crearHijo();
+		//crearHijo();
 
 		if(getpid() != PPADRE){
-			//cicloSem();
+			cicloSem();
 		}
+		
 	
 	}
 
 	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
+	
 	/*int num=semctl(sem,5,GETVAL);
 	printf("VALOR DEL SEMAFORO %d\n",num);*/
-	while(1) {
+	
+	//5.- BUBLE INFINITO SALE CON CTRL+C
+	while(ejecuta) {
 		if(getpid() == PPADRE) {
-			for(int i=0;i<nproc;i++){
-				if(getpid()==PPADRE){
-					CRUCE_nuevo_proceso();
-					crearHijo();
-				}else{
-					break;
-				}
-			}
-
-			if(getpid()!=PPADRE){
-				waitf(5,1);
-				iniciarCoches();
-				/*switch(tipo) {
-					case 0: iniciarCoches();
-					break;
-
-					case 1:iniciarPeatones();
-					break;
-
-					default: perror("ERROR SWITCH"); exit(errno);
-				}*/
-				
-			}
-			if(getpid()==PPADRE){
-				for(int i=0;i<nproc;i++){
-					if(wait(NULL)==-1){//WAIT() DEL HIJO ZOMBIE ENCARGADO DEL CICLO SEMADORICO PARA QUE SUELTE LOS RECURSOS
-						perror("wait");
-					}
-				
-				}
-			}
-				
+			CRUCE_nuevo_proceso();
+			crearHijo();
+		
+		}else{
+			signal(SIGINT, SIG_IGN);
+			waitf(5,1);
+			iniciarCoches();
+			break;
+					
 		}
-	}
+			
+		
+	}			
+	
+	/*switch(tipo) {
+		case 0: iniciarCoches();
+			break;
+
+		case 1:iniciarPeatones();
+			break;
+
+		default: perror("ERROR SWITCH"); exit(errno);
+	}*/
+	
+	return 0;
 	
  	
 
@@ -235,21 +225,28 @@ void nPausas(int n) {
 }
 
 
-void limpiarIPCS(int signal) {
-	if(signal == SIGINT) {
-		printf("Interrupción\n");
-		shmdt(&mc);//Desasociacion
-		if(shmctl(memid,IPC_RMID,NULL)==-1){
-			perror("Error Liberar Memoria Compartida");
-			exit(errno);
+void limpiarIPCS() {
+	int PID;
+	while(PID = wait(NULL)){
+		if(errno == ECHILD){
+			break;
 		}
-		if(semctl(sem, 0, IPC_RMID) == -1){
-	 		perror("Error semctl"); 
-			exit(errno);
-		}
-		CRUCE_fin();
-		//exit(0);
 	}
+	shmdt(&mc);//Desasociacion
+	if(shmctl(memid,IPC_RMID,NULL)==-1){
+		perror("Error Liberar Memoria Compartida");
+		exit(errno);
+	}
+	if(sem!=-1){
+		if(semctl(sem, 0, IPC_RMID) == -1){
+		 	perror("Error semctl"); 
+			exit(errno);
+		}
+	}
+	CRUCE_fin();
+	ejecuta=0;
+	
+		
 }
 
 void waitf(int numsem,int numwait) {
@@ -319,3 +316,4 @@ void iniciarPeatones() {
 	
 
 }
+
