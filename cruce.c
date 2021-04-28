@@ -109,24 +109,28 @@ int memid;
 	*/
 	//5.- BUBLE INFINITO SALE CON CTRL+C
 	while(ejecuta) {
+		if(getpid()==PPADRE){
+			CRUCE_nuevo_proceso();
 
-		CRUCE_nuevo_proceso();
-
-		pid_t pid = fork();
- 	
- 		switch(pid) {
-			case -1:
-				system("clear");
-				perror("Error creando hijos");
-				exit(errno);
-			case 0:
-				signal(SIGINT, SIG_IGN);
-				//waitf(5,2);
-				iniciarCoches();
-			default:
-				continue;
-				//signalf(5,1);
-			
+			pid_t pid = fork();
+	 		
+	 		switch(pid) {
+				case -1:
+					system("clear");
+					perror("Error creando hijos");
+					exit(errno);
+				case 0:
+					signal(SIGINT, SIG_IGN);
+					waitf(5,2);
+					
+				default:
+					continue;
+					
+				
+	 		}
+ 		}else{
+ 			iniciarCoches();
+ 		
  		}
 		/*if(getpid() == PPADRE) {
 
@@ -317,11 +321,8 @@ void iniciarCoches() {
 
 		pausa_coche();
 	}
-	
+	signalf(5,1);
 	CRUCE_fin_coche();
-	exit(0);
-	
-
 }
 
 void iniciarPeatones() {
