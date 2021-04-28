@@ -124,9 +124,10 @@ int memid;
 				exit(errno);
 			case 0:
 				signal(SIGINT, SIG_IGN);
-				//waitf(5,1);
+				waitf(5,1);
 				iniciarCoches();
 			default:
+				wait(NULL);
 				signalf(5,1);
 			
  		}
@@ -279,7 +280,7 @@ void limpiarIPCS() {
 		}
 	}
 	CRUCE_fin();
-	ejecuta=0;
+	exit(0);
 	
 		
 }
@@ -321,7 +322,6 @@ void iniciarCoches() {
 	}
 	
 	CRUCE_fin_coche();
-	signalf(5,1);
 	exit(0);
 	
 
