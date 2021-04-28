@@ -83,7 +83,11 @@ int memid;
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
 	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
-
+	
+	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
+	
+	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
 
@@ -98,12 +102,9 @@ int memid;
 	
 	}
 
-	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
-	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
-	
 	/*int num=semctl(sem,5,GETVAL);
-	printf("VALOR DEL SEMAFORO %d\n",num);*/
-	
+	printf("VALOR DEL SEMAFORO %d\n",num);
+	*/
 	//5.- BUBLE INFINITO SALE CON CTRL+C
 	while(ejecuta) {
 		if(getpid() == PPADRE) {
@@ -142,7 +143,7 @@ int memid;
  		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
 		 
  		waitf(4,1);
-		
+		//FASE 1
 
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
 		//signalf(0,1);
@@ -162,7 +163,8 @@ int memid;
 		cruce(0,3);
 		
 		waitf(4,1);
-
+		//FASE 2
+		
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
 		//waitf(0,1);
 		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
@@ -182,7 +184,8 @@ int memid;
 
 
 		nPausas(2);
-
+		//FASE 3
+		
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
 		//waitf(0,1);
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
