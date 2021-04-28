@@ -30,7 +30,7 @@ void limpiarIPCS();
 void waitf(int,int);
 void signalf(int,int);
 
-void crearHijo();
+int crearHijo();
 void cicloSem();
 
 void nPausas(int n);
@@ -50,14 +50,15 @@ int memid;
 
 /*union semun {
 	int val;
-    	struct semid_ds *buf;
-    	ushort_t *array;
-};*/
+    struct semid_ds *buf;
+    ushort_t *array;
+} semunSolaris;*/
 
 
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
  	int i;
+	pid_t pid;
  	
  	//MANEJADORAS CTRL+C
  	sa.sa_handler = &limpiarIPCS;
@@ -83,8 +84,10 @@ int memid;
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
 	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
-	
-	if(semctl(sem, 5, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
+
+	//semunSolaris.val = nproc;
+
+	if(semctl(sem, 5, SETVAL, nproc /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
 	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
 	
 	
@@ -102,24 +105,46 @@ int memid;
 	
 	}
 
+	
+
 	/*int num=semctl(sem,5,GETVAL);
 	printf("VALOR DEL SEMAFORO %d\n",num);
 	*/
 	//5.- BUBLE INFINITO SALE CON CTRL+C
 	while(ejecuta) {
-		if(getpid() == PPADRE) {
+
+		CRUCE_nuevo_proceso();
+
+		pid_t pid = fork();
+ 	
+ 		switch(pid) {
+			case -1:
+				system("clear");
+				perror("Error creando hijos");
+				exit(errno);
+			case 0:
+				signal(SIGINT, SIG_IGN);
+				//waitf(5,1);
+				iniciarCoches();
+			default:
+				signalf(5,1);
+			
+ 		}
+		/*if(getpid() == PPADRE) {
+
 			CRUCE_nuevo_proceso();
-			crearHijo();
+			controlFork = crearHijo();
+			
 		
-		}else{
+		}
+		
+		if(controlFork == 0) {
 			signal(SIGINT, SIG_IGN);
 			waitf(5,1);
 			iniciarCoches();
-			break;
-					
-		}
-			
-		
+			//break;			
+		}*/
+				
 	}			
 	
 	/*switch(tipo) {
@@ -137,10 +162,13 @@ int memid;
  	
 
  } 
+
+
  void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
- 		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
+ 		//semunSolaris.val = 1;
+		if (semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
 		 
  		waitf(4,1);
 		//FASE 1
@@ -158,7 +186,7 @@ int memid;
 		nPausas(6);
 
 		//SEM_C1 A AMARILLO
-		if (semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); }
+		if (semctl(sem, 4, SETVAL, 1/*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
 
 		cruce(0,3);
 		
@@ -209,7 +237,7 @@ void cruce(int sem,int color) {
 
 //Mientras haya cambio de semaforos bloqueamos la entrada al cruce de todos los procesos
 
- void crearHijo(){
+ int crearHijo(){
  	pid_t pid = fork();
  	
  	switch(pid) {
@@ -217,6 +245,10 @@ void cruce(int sem,int color) {
  			system("clear");
  			perror("Error creando hijos");
  			exit(errno);
+		case 0:
+			return pid;
+		default:
+			return pid;
  	}
  } 
 
