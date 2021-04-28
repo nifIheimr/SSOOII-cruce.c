@@ -97,12 +97,9 @@ int memid;
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	if(getpid() == PPADRE){
 		//crearHijo();
-
 		if(getpid() != PPADRE){
 			cicloSem();
 		}
-		
-	
 	}
 
 	
@@ -124,11 +121,11 @@ int memid;
 				exit(errno);
 			case 0:
 				signal(SIGINT, SIG_IGN);
-				waitf(5,1);
+				//waitf(5,2);
 				iniciarCoches();
 			default:
-				wait(NULL);
-				signalf(5,1);
+				continue;
+				//signalf(5,1);
 			
  		}
 		/*if(getpid() == PPADRE) {
@@ -169,9 +166,9 @@ int memid;
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
  		//semunSolaris.val = 1;
-		if (semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
+		//if (semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
 		 
- 		waitf(4,1);
+ 		//waitf(4,1);
 		//FASE 1
 
 		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
@@ -183,15 +180,15 @@ int memid;
 		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
 		//signalf(3,1);
 		
-		signalf(4,1);
+		//signalf(4,1);
 		nPausas(6);
 
 		//SEM_C1 A AMARILLO
-		if (semctl(sem, 4, SETVAL, 1/*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
+		//if (semctl(sem, 4, SETVAL, 1/*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
 
 		cruce(0,3);
 		
-		waitf(4,1);
+		//waitf(4,1);
 		//FASE 2
 		
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
@@ -206,7 +203,7 @@ int memid;
 
 		nPausas(9);
 
-		signalf(4,1);
+		//signalf(4,1);
 		
 		//SEM_C2 A AMARILLO
 		cruce(1,3);
