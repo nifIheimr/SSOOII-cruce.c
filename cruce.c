@@ -19,7 +19,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define NSEMAFOROS 7
+#define NSEMAFOROS 12
 #define TAMMC 256
 #define MAXPROCESOS 127
 
@@ -39,7 +39,6 @@ void iniciarPeatones();
 void iniciarCoches();
 void cruce();
 
-int comprobarPos(struct posiciOn);
 
 struct sembuf sopsEntrar,sopsSalir;
 struct sigaction sa;
@@ -89,17 +88,22 @@ int memid;
 
 	//semunSolaris.val = nproc;
 	
-	if(semctl(sem, 1, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Bucle de coches
+	
+	if(semctl(sem, 1, SETVAL, nproc /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); } //Control de Max Proc
 	
 	if(semctl(sem, 2, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Comprobar Coches
 	
 	if(semctl(sem, 3, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Iniciar Mov Coche
 	
 	if(semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Mover Pos Sig Coche
-
-	if(semctl(sem, 5, SETVAL, nproc /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); } //Operaciones del semaforo: Asigna nprocs de valor al semaforo 0
-	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } 
 	
+	if(semctl(sem, 5, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Bucle de coches
+	
+	if(semctl(sem, 6, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Bucle de coches
+	
+	if(semctl(sem, 7, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
+	
+	if(semctl(sem, 8, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
 	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -122,7 +126,7 @@ int memid;
 	while(ejecuta) {
 		if(getpid()==PPADRE){
 		
-			waitf(5,1);
+			waitf(1,1);
 			
 			CRUCE_nuevo_proceso();
 			
@@ -168,62 +172,40 @@ int memid;
  void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
- 		//semunSolaris.val = 1;
-		//if (semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
-		 
- 		//waitf(4,1);
-		//FASE 1
 
-		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
-		//signalf(0,1);
-		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
-		//waitf(1,1);
-		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
-		//waitf(2,1);
-		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
-		//signalf(3,1);
+		//FASE 1
 		
-		//signalf(4,1);
+		CRUCE_pon_semAforo(0,2);//SEM_C1 A VERDE
+		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
+		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
+		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
+		signalf(7,1);
 		nPausas(6);
+		waitf(7,1);
 
 		//SEM_C1 A AMARILLO
-		//if (semctl(sem, 4, SETVAL, 1/*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); }
-
 		cruce(0,3);
+		nPausas(2);
 		
-		//waitf(4,1);
+		
 		//FASE 2
-		
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
-		//waitf(0,1);
 		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
-		//signalf(1,1);
 		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
-		//waitf(2,1);
 		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO		
-		//waitf(3,1);	
-		
-
 		nPausas(9);
 
-		//signalf(4,1);
 		
 		//SEM_C2 A AMARILLO
 		cruce(1,3);
-
-
 		nPausas(2);
-		//FASE 3
 		
+		
+		//FASE 3
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
-		//waitf(0,1);
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
-		//waitf(1,1);
 		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
-		//signalf(2,1);
 		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
-		//waitf(3,1);
-
 		nPausas(12);
 		
 			
@@ -306,41 +288,58 @@ void signalf(int numsem,int numsignal) {
 }
 
 void iniciarCoches() {
-	int compro;
-	struct posiciOn posSig, posSigSig, posPrueba;
+	int compro,cont;
+	struct posiciOn posSig, posSigSig,posPrueba;
 	posSigSig.x=0;
 	posSigSig.y=0;
+
 	
 	waitf(2,1);//wait de comprobacion
 	compro=0;
 	posSig = CRUCE_inicio_coche();
 	
 	waitf(3,1);//wait para iniciar el mov
-	
+	/*if(posSig==en la raya){
+		waitf(7,1);
+		posSigSig = CRUCE_avanzar_coche(posSig);
+		signalf(7,1);
+	}*/
 	posSigSig = CRUCE_avanzar_coche(posSig);
 	
-	waitf(1,1);//wait solo un proceso en el bucle (MEJORAR)
+	waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
 	while(posSigSig.y >= 0) {
-	
+		
 		waitf(4,1);//wait para siguiente posicion
-		posSigSig = CRUCE_avanzar_coche(posSigSig);
+		posSigSig= CRUCE_avanzar_coche(posSigSig);
+		waitf(6,1);
+		
 		if(compro==0){//Solo entra una vez cada PROCESO
 			compro=1;
 			signalf(2,1);//signal de comprobacion
 			signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+			pausa_coche();
 		}
-		signalf(4,1);//signal para siguiente posicion
+		if(posSigSig.y >= 0){
+			posSigSig = CRUCE_avanzar_coche(posSigSig);
+			signalf(4,1);//signal para siguiente posicion
+			signalf(6,1);
+		}else{
+			
+			signalf(4,1);//signal para siguiente posicion
+			signalf(6,1);
+		}
 		pausa_coche();
 		
 		
-		
-	}
-	signalf(1,1);//signal solo un proceso en el bucle (MEJORAR)
 	
-	//signalf(5,1);
+	}
+	signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
+	
+	//signalf(1,1);//Signal del final del Proceso
 	CRUCE_fin_coche();
 	//kill(getpid(),SIGTERM);
 }
+
 
 void iniciarPeatones() {
 	struct posiciOn posSig, posSigSig, posNac;
