@@ -16,15 +16,14 @@
 #include <sys/msg.h>
 #include "cruce.h"
 
-
 #define TRUE    1
 #define FALSE   0
 #define NSEMAFOROS 12
 #define TAMMC 256
 #define MAXPROCESOS 127
+#define LONGITUD_MAXIMA_MSJ 80
 
-
-static volatile sig_atomic_t ejecuta=1;
+static volatile sig_atomic_t ejecuta = 1;
 
 void limpiarIPCS();
 void waitf(int,int);
@@ -39,21 +38,25 @@ void iniciarPeatones();
 void iniciarCoches();
 void cruce();
 
-
 struct sembuf sopsEntrar,sopsSalir;
 struct sigaction sa;
-
 
 int sem;
 char *mc =  NULL;
 int memid;
 
 
-/*union semun {
+union semun {
 	int val;
     struct semid_ds *buf;
     ushort_t *array;
-} semunSolaris;*/
+} semunSolaris;
+
+struct tipo_mensaje {
+	long tipo;
+    char remite[12];
+    char msg[LONGITUD_MAXIMA_MSJ];
+} mensaje;
 
 
  int main(int argc, char *argv[]) {
@@ -61,12 +64,17 @@ int memid;
  	int i;
 	pid_t pid;
  	
+	key_t clave;
+	int buzon, envio, recibo;
+	char etiqueta[100];
+	struct passwd *informe;
+
  	//MANEJADORAS CTRL+C
  	sa.sa_handler = &limpiarIPCS;
-    	if (sigemptyset(&sa.sa_mask) != 0) return 0;
-    	if (sigaddset(&sa.sa_mask, SIGINT) != 0) return 0;
-    	sa.sa_flags = 0;
-    	if (sigaction(SIGINT, &sa, NULL) != 0) return 0;
+    if (sigemptyset(&sa.sa_mask) != 0) return 0;
+    if (sigaddset(&sa.sa_mask, SIGINT) != 0) return 0;
+    sa.sa_flags = 0;
+    if (sigaction(SIGINT, &sa, NULL) != 0) return 0;
        
        
 	//1. COGER Y VERIFICAR INFO DE ARGUMENTOS
@@ -81,31 +89,37 @@ int memid;
 	
 	if((sem = semget(IPC_PRIVATE, NSEMAFOROS, IPC_CREAT | 0600)) == -1) { perror("Error semget"); exit(errno); }; //Iniciar semaforo
 	
-
 	if((memid = shmget(IPC_PRIVATE, TAMMC, IPC_CREAT | 0600)) == -1) { perror("Error memid"); exit(errno); }; //Creacion de memoria compartida (Min: 256 bytes)
 	
 	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
 
-	//semunSolaris.val = nproc;
+	semunSolaris.val = nproc;
 	
+	if(semctl(sem, 1, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Control de Max Proc
 	
-	if(semctl(sem, 1, SETVAL, nproc /*semunSolaris*/) == -1) { perror("Error semctl"); exit(errno); } //Control de Max Proc
+	semunSolaris.val = 1;
+
+	if(semctl(sem, 2, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Comprobar Coches
 	
-	if(semctl(sem, 2, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Comprobar Coches
+	if(semctl(sem, 3, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Iniciar Mov Coche
 	
-	if(semctl(sem, 3, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Iniciar Mov Coche
+	if(semctl(sem, 4, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Mover Pos Sig Coche
 	
-	if(semctl(sem, 4, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Mover Pos Sig Coche
+	if(semctl(sem, 5, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Bucle de coches
 	
-	if(semctl(sem, 5, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Bucle de coches
+	if(semctl(sem, 6, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Bucle de coches
+
+	semunSolaris.val = 0;
+
+	if(semctl(sem, 7, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
+
+	if(semctl(sem, 8, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
+
+	semunSolaris.val = 1;
+
+	if(semctl(sem, 9, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo PAUSAS 
 	
-	if(semctl(sem, 6, SETVAL, 1 /*semunSolaris*/) == -1) { perror("Error semctl");}//Bucle de coches
-	
-	if(semctl(sem, 7, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
-	
-	if(semctl(sem, 8, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
-	
-	if(semctl(sem, 9, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } //Semaforo PAUSAS 
+	if((buzon = msgget(clave, IPC_CREAT | 0666) == -1)) { perror("No se puede crear/encontrar el buzon"); }
 	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -138,7 +152,7 @@ int memid;
 				case -1:
 					system("clear");
 					perror("Error creando hijos");
-					exit(errno);
+					exit(1);
 				case 0:
 					signal(SIGINT, SIG_IGN);
 					
@@ -147,7 +161,7 @@ int memid;
 					
 				
 	 		}
-	 	}else if(getpid()!=PPADRE){
+	 	} else if(getpid()!=PPADRE){
 	 		iniciarCoches();
  			//exit(0); //HACER QUE EL PROCESO TERMINE O NO??!!
 	 	}
@@ -216,8 +230,7 @@ int memid;
 
 void cruce(int sem,int color) {
 	CRUCE_pon_semAforo(sem,color);//SEM A AMARILLO
-	pausa();
-	pausa();
+	nPausas(2);
 }
 
 //Mientras haya cambio de semaforos bloqueamos la entrada al cruce de todos los procesos
@@ -252,12 +265,14 @@ void limpiarIPCS() {
 			break;
 		}
 	}
-	shmdt(&mc);//Desasociacion
+
+	shmdt(mc); //Desasociacion CAMBIAR EN ENCINA &mc -> mc
+
 	if(shmctl(memid,IPC_RMID,NULL)==-1){
 		perror("Error Liberar Memoria Compartida");
 		exit(errno);
 	}
-	if(sem!=-1){
+	if(sem != -1){
 		if(semctl(sem, 0, IPC_RMID) == -1){
 		 	perror("Error semctl"); 
 			exit(errno);
@@ -313,11 +328,15 @@ void iniciarCoches() {
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
 				signalf(7,1);
 			}
-			posSigSig= CRUCE_avanzar_coche(posSigSig);
+
+			posSigSig = CRUCE_avanzar_coche(posSigSig);
+
+			if(compro == 1) { pausa_coche(); } 
+
 			waitf(6,1);
 				
-			if(compro==0){//Solo entra una vez cada PROCESO
-				compro=1;
+			if(compro == 0){//Solo entra una vez cada PROCESO
+				compro = 1;
 				signalf(2,1);//signal de comprobacion
 				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
 				pausa_coche();
@@ -336,17 +355,15 @@ void iniciarCoches() {
 				signalf(4,1);//signal para siguiente posicion
 				signalf(6,1);
 			}
-			pausa_coche();
-		
-		
 	
 		}
+
 		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
 	
 		//signalf(1,1);//Signal del final del Proceso
 		CRUCE_fin_coche();
 		
-	}else if(posSig.x==-3 && posSig.y==10){//CARRETERA IZQUIERDA SEM (C2)
+	} else if(posSig.x==-3 && posSig.y==10){//CARRETERA IZQUIERDA SEM (C2)
 		waitf(3,1);//wait para iniciar el mov
 		posSigSig = CRUCE_avanzar_coche(posSig);
 		
@@ -354,22 +371,26 @@ void iniciarCoches() {
 		while(posSigSig.y >= 0) {
 		
 			waitf(4,1);//wait para siguiente posicion
-			if(posSigSig.x==11 && posSigSig.y==10){
+			if(posSigSig.x == 11 && posSigSig.y == 10){
 				waitf(8,1);
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
 				signalf(8,1);
 			}
+
 			posSigSig= CRUCE_avanzar_coche(posSigSig);
+
+			if(compro == 1) { pausa_coche(); } 
+
 			waitf(6,1);
 				
-			if(compro==0){//Solo entra una vez cada PROCESO
-				compro=1;
+			if(compro == 0){//Solo entra una vez cada PROCESO
+				compro = 1;
 				signalf(2,1);//signal de comprobacion
 				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
 				pausa_coche();
 				}
 			if(posSigSig.y >= 0){
-				if(posSigSig.x==11 && posSigSig.y==10){
+				if(posSigSig.x == 11 && posSigSig.y == 10){
 					waitf(8,1);
 					posSigSig = CRUCE_avanzar_coche(posSigSig);
 					signalf(8,1);
@@ -377,21 +398,19 @@ void iniciarCoches() {
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
 				signalf(4,1);//signal para siguiente posicion
 				signalf(6,1);
-			}else{
+			} else{
 				
 				signalf(4,1);//signal para siguiente posicion
 				signalf(6,1);
 			}
-			pausa_coche();
-		
-		
-	
+
 		}
+
 		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
 	
 		//signalf(1,1);//Signal del final del Proceso
 		CRUCE_fin_coche();
-	
+
 	}
 }
 
