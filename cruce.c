@@ -18,7 +18,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define NSEMAFOROS 12
+#define NSEMAFOROS 15
 #define TAMMC 256
 #define MAXPROCESOS 127
 #define LONGITUD_MAXIMA_MSJ 80
@@ -46,11 +46,6 @@ char *mc =  NULL;
 int memid;
 
 
-union semun {
-	int val;
-    struct semid_ds *buf;
-    ushort_t *array;
-} semunSolaris;
 
 
 
@@ -59,6 +54,10 @@ union semun {
  	int i,tipo;
 	pid_t pid;
  	
+	key_t clave;
+	int buzon, envio, recibo;
+	char etiqueta[100];
+	struct passwd *informe;
 
  	//MANEJADORAS CTRL+C
  	sa.sa_handler = &limpiarIPCS;
@@ -84,40 +83,36 @@ union semun {
 	
 	mc = shmat(memid, NULL, 0); //Asociamos el puntero que devuelve shmat a una variable 
 
-	semunSolaris.val = nproc;
 	
-	if(semctl(sem, 1, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Control de Max Proc
-	
-	semunSolaris.val = 1;
+	if(semctl(sem, 1, SETVAL, nproc) == -1) { perror("Error semctl"); exit(errno); } //Control de Max Proc
 
-	if(semctl(sem, 2, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Comprobar Coches
+	if(semctl(sem, 2, SETVAL, 1) == -1) { perror("Error semctl");}//Comprobar Coches
 	
-	if(semctl(sem, 3, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Iniciar Mov Coche
+	if(semctl(sem, 3, SETVAL, 1) == -1) { perror("Error semctl");}//Iniciar Mov Coche
 	
-	if(semctl(sem, 4, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Mover Pos Sig Coche
+	if(semctl(sem, 4, SETVAL, 1) == -1) { perror("Error semctl");}//Mover Pos Sig Coche
 	
-	if(semctl(sem, 5, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Bucle de coches
+	if(semctl(sem, 5, SETVAL, 1) == -1) { perror("Error semctl");}//Bucle de coches
 	
-	if(semctl(sem, 6, SETVAL, semunSolaris) == -1) { perror("Error semctl");}//Bucle de coches
+	if(semctl(sem, 6, SETVAL, 1) == -1) { perror("Error semctl");}//Bucle de coches
 
-	semunSolaris.val = 0;
 
-	if(semctl(sem, 7, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
+	if(semctl(sem, 7, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
 
-	if(semctl(sem, 8, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
+	if(semctl(sem, 8, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
 
-	if(semctl(sem, 9, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P1
+
+	if(semctl(sem, 9, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P1
 	
-	if(semctl(sem, 10, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P2
+	if(semctl(sem, 10, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P2
 	
-	semunSolaris.val = 1;
+	if(semctl(sem, 11, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } //Inicio Peaton
 	
-	if(semctl(sem, 11, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Inicio Peaton
+	if(semctl(sem, 12, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } //MOver Pos Sig Peaton
 	
-	if(semctl(sem, 12, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Mover Pos Sig Peaton
+	if(semctl(sem, 13, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } //BUcle Peaton
 	
-	if(semctl(sem, 13, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //BUcle Peaton
-	
+	if((buzon = msgget(clave, IPC_CREAT | 0666) == -1)) { perror("No se puede crear/encontrar el buzon"); }
 	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -142,7 +137,7 @@ union semun {
 		
 			waitf(1,1);
 			
-			int tipo=CRUCE_nuevo_proceso();
+			 tipo=CRUCE_nuevo_proceso();
 			
 			pid_t pid = fork();
 
@@ -160,8 +155,8 @@ union semun {
 				
 	 		}
 	 	} else if(getpid()!=PPADRE){
-	 		iniciarCoches();
-	 		/*switch(tipo) {
+	 		
+	 		switch(tipo) {
 				case 0: iniciarCoches();
 					break;
 
@@ -169,7 +164,8 @@ union semun {
 					break;
 
 				default: perror("ERROR SWITCH"); exit(errno);
-			}*/
+			
+			}
  			//exit(0); //HACER QUE EL PROCESO TERMINE O NO??!!
 	 	}
 	 }
@@ -184,7 +180,7 @@ union semun {
  } 
 
 
-  void cicloSem(){
+ void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
 
@@ -231,7 +227,6 @@ union semun {
 	}
 }
 
-
 void cruce(int sem,int color) {
 	CRUCE_pon_semAforo(sem,color);//SEM A AMARILLO
 	nPausas(2);
@@ -270,7 +265,7 @@ void limpiarIPCS() {
 		}
 	}
 
-	shmdt(mc); //Desasociacion CAMBIAR EN ENCINA &mc -> mc
+	shmdt(&mc); //Desasociacion CAMBIAR EN ENCINA &mc -> mc
 
 	if(shmctl(memid,IPC_RMID,NULL)==-1){
 		perror("Error Liberar Memoria Compartida");
@@ -309,7 +304,7 @@ void signalf(int numsem,int numsignal) {
 }
 
 void iniciarCoches() {
-	int compro,cont;
+	int compro;
 	struct posiciOn posSig, posSigSig,posPrueba;
 	posSigSig.x=0;
 	posSigSig.y=0;
@@ -340,7 +335,6 @@ void iniciarCoches() {
 			signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
 			pausa_coche();
 		}
-		waitf(4,1);
 		if(posSigSig.y >= 0){
 			if(posSig.x==33 && posSig.y==4){
 				waitf(7,1);
@@ -356,7 +350,7 @@ void iniciarCoches() {
 		}
 	
 	}
-	signalf(5,1);//Que pase el siguiente proceso al bucle
+	signalf(5,1);
 	
 	//signalf(1,1);//Signal del final del Proceso
 	CRUCE_fin_coche();
@@ -418,5 +412,4 @@ void iniciarPeatones() {
 	
 
 }
-
 
