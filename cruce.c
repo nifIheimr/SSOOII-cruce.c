@@ -105,12 +105,14 @@ int memid;
 	
 	if(semctl(sem, 8, SETVAL, 0) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
 	
+	if(semctl(sem, 9, SETVAL, 1) == -1) { perror("Error semctl"); exit(errno); } //Semaforo PAUSAS 
+	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
 
 	//4. CREAR PROCESO GESTOR DE SEMAFOROS
 	if(getpid() == PPADRE){
-		//crearHijo();
+		crearHijo();
 		if(getpid() != PPADRE){
 			cicloSem();
 		}
@@ -192,9 +194,10 @@ int memid;
 		CRUCE_pon_semAforo(0,1);//SEM_C1 A ROJO
 		CRUCE_pon_semAforo(1,2);//SEM_C2 A VERDE
 		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
-		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO		
+		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
+		signalf(8,1);		
 		nPausas(9);
-
+		waitf(8,1);
 		
 		//SEM_C2 A AMARILLO
 		cruce(1,3);
@@ -207,7 +210,6 @@ int memid;
 		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
 		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
 		nPausas(12);
-		
 			
 	}
 }
@@ -293,51 +295,104 @@ void iniciarCoches() {
 	posSigSig.x=0;
 	posSigSig.y=0;
 
-	
+	posPrueba.x=11;
+	posPrueba.y=10;
 	waitf(2,1);//wait de comprobacion
 	compro=0;
 	posSig = CRUCE_inicio_coche();
 	
-	waitf(3,1);//wait para iniciar el mov
-	/*if(posSig==en la raya){
-		waitf(7,1);
+	if(posSig.x==33 && posSig.y==1){//CARRETERA ARRIBA (SEM C1)
+		waitf(3,1);//wait para iniciar el mov	
 		posSigSig = CRUCE_avanzar_coche(posSig);
-		signalf(7,1);
-	}*/
-	posSigSig = CRUCE_avanzar_coche(posSig);
-	
-	waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
-	while(posSigSig.y >= 0) {
-		
-		waitf(4,1);//wait para siguiente posicion
-		posSigSig= CRUCE_avanzar_coche(posSigSig);
-		waitf(6,1);
-		
-		if(compro==0){//Solo entra una vez cada PROCESO
-			compro=1;
-			signalf(2,1);//signal de comprobacion
-			signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+
+		waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
+		while(posSigSig.y >= 0) {
+			waitf(4,1);//wait para siguiente posicion
+			if(posSigSig.x==33 && posSigSig.y==4){
+				waitf(7,1);
+				posSigSig = CRUCE_avanzar_coche(posSigSig);
+				signalf(7,1);
+			}
+			posSigSig= CRUCE_avanzar_coche(posSigSig);
+			waitf(6,1);
+				
+			if(compro==0){//Solo entra una vez cada PROCESO
+				compro=1;
+				signalf(2,1);//signal de comprobacion
+				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+				pausa_coche();
+				}
+			if(posSigSig.y >= 0){
+				if(posSig.x==33 && posSig.y==4){
+					waitf(7,1);
+					posSigSig = CRUCE_avanzar_coche(posSigSig);
+					signalf(7,1);
+				}
+				posSigSig = CRUCE_avanzar_coche(posSigSig);
+				signalf(4,1);//signal para siguiente posicion
+				signalf(6,1);
+			}else{
+				
+				signalf(4,1);//signal para siguiente posicion
+				signalf(6,1);
+			}
 			pausa_coche();
-		}
-		if(posSigSig.y >= 0){
-			posSigSig = CRUCE_avanzar_coche(posSigSig);
-			signalf(4,1);//signal para siguiente posicion
-			signalf(6,1);
-		}else{
-			
-			signalf(4,1);//signal para siguiente posicion
-			signalf(6,1);
-		}
-		pausa_coche();
 		
 		
+	
+		}
+		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
+	
+		//signalf(1,1);//Signal del final del Proceso
+		CRUCE_fin_coche();
+		
+	}else if(posSig.x==-3 && posSig.y==10){//CARRETERA IZQUIERDA SEM (C2)
+		waitf(3,1);//wait para iniciar el mov
+		posSigSig = CRUCE_avanzar_coche(posSig);
+		
+		waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
+		while(posSigSig.y >= 0) {
+		
+			waitf(4,1);//wait para siguiente posicion
+			if(posSigSig.x==11 && posSigSig.y==10){
+				waitf(8,1);
+				posSigSig = CRUCE_avanzar_coche(posSigSig);
+				signalf(8,1);
+			}
+			posSigSig= CRUCE_avanzar_coche(posSigSig);
+			waitf(6,1);
+				
+			if(compro==0){//Solo entra una vez cada PROCESO
+				compro=1;
+				signalf(2,1);//signal de comprobacion
+				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+				pausa_coche();
+				}
+			if(posSigSig.y >= 0){
+				if(posSigSig.x==11 && posSigSig.y==10){
+					waitf(8,1);
+					posSigSig = CRUCE_avanzar_coche(posSigSig);
+					signalf(8,1);
+				}
+				posSigSig = CRUCE_avanzar_coche(posSigSig);
+				signalf(4,1);//signal para siguiente posicion
+				signalf(6,1);
+			}else{
+				
+				signalf(4,1);//signal para siguiente posicion
+				signalf(6,1);
+			}
+			pausa_coche();
+		
+		
+	
+		}
+		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
+	
+		//signalf(1,1);//Signal del final del Proceso
+		CRUCE_fin_coche();
 	
 	}
-	signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
-	
-	//signalf(1,1);//Signal del final del Proceso
-	CRUCE_fin_coche();
-	//kill(getpid(),SIGTERM);
 }
 
 
