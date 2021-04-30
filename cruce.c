@@ -52,22 +52,13 @@ union semun {
     ushort_t *array;
 } semunSolaris;
 
-struct tipo_mensaje {
-	long tipo;
-    char remite[12];
-    char msg[LONGITUD_MAXIMA_MSJ];
-} mensaje;
 
 
  int main(int argc, char *argv[]) {
  	pid_t PPADRE = getpid();
- 	int i;
+ 	int i,tipo;
 	pid_t pid;
  	
-	key_t clave;
-	int buzon, envio, recibo;
-	char etiqueta[100];
-	struct passwd *informe;
 
  	//MANEJADORAS CTRL+C
  	sa.sa_handler = &limpiarIPCS;
@@ -111,15 +102,22 @@ struct tipo_mensaje {
 
 	semunSolaris.val = 0;
 
-	if(semctl(sem, 7, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
+	if(semctl(sem, 7, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C1
 
-	if(semctl(sem, 8, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
+	if(semctl(sem, 8, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo C2
 
-	semunSolaris.val = 1;
-
-	if(semctl(sem, 9, SETVAL, semunSolaris) == -1) { perror("Error semctl"); exit(errno); } //Semaforo PAUSAS 
+	if(semctl(sem, 9, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P1
 	
-	if((buzon = msgget(clave, IPC_CREAT | 0666) == -1)) { perror("No se puede crear/encontrar el buzon"); }
+	if(semctl(sem, 10, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Semaforo P2
+	
+	semunSolaris.val = 1;
+	
+	if(semctl(sem, 11, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Inicio Peaton
+	
+	if(semctl(sem, 12, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //Mover Pos Sig Peaton
+	
+	if(semctl(sem, 13, SETVAL, semunSolaris.val) == -1) { perror("Error semctl"); exit(errno); } //BUcle Peaton
+	
 	
 	//3. LLAMAR A CRUCE_inicio
 	CRUCE_inicio(velocidad, nproc, sem, mc);
@@ -144,7 +142,7 @@ struct tipo_mensaje {
 		
 			waitf(1,1);
 			
-			CRUCE_nuevo_proceso();
+			int tipo=CRUCE_nuevo_proceso();
 			
 			pid_t pid = fork();
 
@@ -163,20 +161,21 @@ struct tipo_mensaje {
 	 		}
 	 	} else if(getpid()!=PPADRE){
 	 		iniciarCoches();
+	 		/*switch(tipo) {
+				case 0: iniciarCoches();
+					break;
+
+				case 1:iniciarPeatones();
+					break;
+
+				default: perror("ERROR SWITCH"); exit(errno);
+			}*/
  			//exit(0); //HACER QUE EL PROCESO TERMINE O NO??!!
 	 	}
 	 }
 		
 	
-	/*switch(tipo) {
-		case 0: iniciarCoches();
-			break;
-
-		case 1:iniciarPeatones();
-			break;
-
-		default: perror("ERROR SWITCH"); exit(errno);
-	}*/
+	
 	
 	return 0;
 	
@@ -185,7 +184,7 @@ struct tipo_mensaje {
  } 
 
 
- void cicloSem(){
+  void cicloSem(){
  	while(1){
 		 //Para comprobar si hay un proceso en la zona critica del cruce hay que comprobar el valor del semaforo
 
@@ -196,8 +195,10 @@ struct tipo_mensaje {
 		CRUCE_pon_semAforo(2,1);//SEM_P1 A ROJO
 		CRUCE_pon_semAforo(3,2);//SEM_P2 A VERDE
 		signalf(7,1);
+		signalf(10,1);
 		nPausas(6);
 		waitf(7,1);
+		waitf(10,1);
 
 		//SEM_C1 A AMARILLO
 		cruce(0,3);
@@ -223,10 +224,13 @@ struct tipo_mensaje {
 		CRUCE_pon_semAforo(1,1);//SEM_C2 A ROJO
 		CRUCE_pon_semAforo(2,2);//SEM_P1 A VERDE
 		CRUCE_pon_semAforo(3,1);//SEM_P2 A ROJO
+		signalf(9,1);
 		nPausas(12);
+		waitf(9,1);
 			
 	}
 }
+
 
 void cruce(int sem,int color) {
 	CRUCE_pon_semAforo(sem,color);//SEM A AMARILLO
@@ -336,6 +340,7 @@ void iniciarCoches() {
 			signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
 			pausa_coche();
 		}
+		waitf(4,1);
 		if(posSigSig.y >= 0){
 			if(posSig.x==33 && posSig.y==4){
 				waitf(7,1);
@@ -361,26 +366,57 @@ void iniciarCoches() {
 
 void iniciarPeatones() {
 	struct posiciOn posSig, posSigSig, posNac;
-	
+	int compro;
 	posNac.x=0;
 	posNac.y=0;
 	
 	posSigSig.x=0;
 	posSigSig.y=0;
 	
+	waitf(11,1);
+	compro=0;
 	posSig = CRUCE_inicio_peatOn_ext(&posNac);
-
+	waitf(12,1);
 	posSigSig = CRUCE_avanzar_peatOn(posSig);
-
+	
+	waitf(13,1);
 	while(posSigSig.y >= 0) {
-		
-		//fprintf(stderr, "%d %d\t", posSigSig.x, posSigSig.y);
-		posSigSig = CRUCE_avanzar_peatOn(posSigSig);
-
-		pausa();
+		if(posSigSig.y==12 && posSigSig.x>20){
+				waitf(10,1);
+				posSigSig = CRUCE_avanzar_peatOn(posSigSig);;
+				signalf(10,1);
+		}else if(posSigSig.x==29){
+				waitf(9,1);
+				posSigSig = CRUCE_avanzar_peatOn(posSigSig);;
+				signalf(9,1);
+		}else{
+				posSigSig = CRUCE_avanzar_peatOn(posSigSig);
+		}
+		if(compro == 1) { pausa();} 
+		if(compro == 0){//Solo entra una vez cada PROCESO
+			compro = 1;
+			signalf(11,1);//signal de comprobacion
+			signalf(12,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+			pausa();
+		}
+		if(posSigSig.y >= 0){
+			if(posSigSig.y==12 && posSigSig.x>20){
+				waitf(10,1);
+				posSigSig = CRUCE_avanzar_peatOn(posSigSig);;
+				signalf(10,1);
+			}else if(posSigSig.x==29){
+				waitf(9,1);
+				posSigSig =CRUCE_avanzar_peatOn(posSigSig);;
+				signalf(9,1);
+			}else{
+				posSigSig = CRUCE_avanzar_peatOn(posSigSig);;
+			}
+		}
 	}
+	signalf(13,1);
 	CRUCE_fin_peatOn();
 	
 
 }
+
 
