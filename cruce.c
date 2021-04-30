@@ -309,109 +309,53 @@ void iniciarCoches() {
 	struct posiciOn posSig, posSigSig,posPrueba;
 	posSigSig.x=0;
 	posSigSig.y=0;
-
-	posPrueba.x=11;
-	posPrueba.y=10;
+	
 	waitf(2,1);//wait de comprobacion
 	compro=0;
 	posSig = CRUCE_inicio_coche();
+	waitf(3,1);//wait para iniciar el mov	
+	posSigSig = CRUCE_avanzar_coche(posSig);
 	
-	if(posSig.x==33 && posSig.y==1){//CARRETERA ARRIBA (SEM C1)
-		waitf(3,1);//wait para iniciar el mov	
-		posSigSig = CRUCE_avanzar_coche(posSig);
-
-		waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
-		while(posSigSig.y >= 0) {
-			waitf(4,1);//wait para siguiente posicion
-			if(posSigSig.x==33 && posSigSig.y==4){
+	waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
+	while(posSigSig.y >= 0) {
+		if(posSigSig.x==33 && posSigSig.y==4){
+			waitf(7,1);
+			posSigSig = CRUCE_avanzar_coche(posSigSig);
+			signalf(7,1);
+		}else if(posSigSig.x == 11 && posSigSig.y == 10){
+			waitf(8,1);
+			posSigSig = CRUCE_avanzar_coche(posSigSig);
+			signalf(8,1);
+		}else{
+			posSigSig = CRUCE_avanzar_coche(posSigSig);
+		}
+		if(compro == 1) { pausa_coche();} 	
+		if(compro == 0){//Solo entra una vez cada PROCESO
+			compro = 1;
+			signalf(2,1);//signal de comprobacion
+			signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
+			pausa_coche();
+		}
+		if(posSigSig.y >= 0){
+			if(posSig.x==33 && posSig.y==4){
 				waitf(7,1);
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
 				signalf(7,1);
-			}
-
-			posSigSig = CRUCE_avanzar_coche(posSigSig);
-
-			if(compro == 1) { pausa_coche(); } 
-
-			waitf(6,1);
-				
-			if(compro == 0){//Solo entra una vez cada PROCESO
-				compro = 1;
-				signalf(2,1);//signal de comprobacion
-				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
-				pausa_coche();
-				}
-			if(posSigSig.y >= 0){
-				if(posSig.x==33 && posSig.y==4){
-					waitf(7,1);
-					posSigSig = CRUCE_avanzar_coche(posSigSig);
-					signalf(7,1);
-				}
-				posSigSig = CRUCE_avanzar_coche(posSigSig);
-				signalf(4,1);//signal para siguiente posicion
-				signalf(6,1);
-			}else{
-				
-				signalf(4,1);//signal para siguiente posicion
-				signalf(6,1);
-			}
-	
-		}
-
-		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
-	
-		//signalf(1,1);//Signal del final del Proceso
-		CRUCE_fin_coche();
-		
-	} else if(posSig.x==-3 && posSig.y==10){//CARRETERA IZQUIERDA SEM (C2)
-		waitf(3,1);//wait para iniciar el mov
-		posSigSig = CRUCE_avanzar_coche(posSig);
-		
-		waitf(5,1);//wait solo un proceso en el bucle (MEJORAR)
-		while(posSigSig.y >= 0) {
-		
-			waitf(4,1);//wait para siguiente posicion
-			if(posSigSig.x == 11 && posSigSig.y == 10){
+			}else if(posSigSig.x == 11 && posSigSig.y == 10){
 				waitf(8,1);
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
 				signalf(8,1);
-			}
-
-			posSigSig= CRUCE_avanzar_coche(posSigSig);
-
-			if(compro == 1) { pausa_coche(); } 
-
-			waitf(6,1);
-				
-			if(compro == 0){//Solo entra una vez cada PROCESO
-				compro = 1;
-				signalf(2,1);//signal de comprobacion
-				signalf(3,1);//signal para indicar que puede pasar a la siguiente posicion, SOLO ENTRA UNA VEZ
-				pausa_coche();
-				}
-			if(posSigSig.y >= 0){
-				if(posSigSig.x == 11 && posSigSig.y == 10){
-					waitf(8,1);
-					posSigSig = CRUCE_avanzar_coche(posSigSig);
-					signalf(8,1);
-				}
+			}else{
 				posSigSig = CRUCE_avanzar_coche(posSigSig);
-				signalf(4,1);//signal para siguiente posicion
-				signalf(6,1);
-			} else{
-				
-				signalf(4,1);//signal para siguiente posicion
-				signalf(6,1);
 			}
-
 		}
-
-		signalf(5,1);//signal solo un proceso en el bucle (MEJORAR)
 	
-		//signalf(1,1);//Signal del final del Proceso
-		CRUCE_fin_coche();
-
 	}
+	signalf(5,1);//Que pase el siguiente proceso al bucle
+	
+	//signalf(1,1);//Signal del final del Proceso
+	CRUCE_fin_coche();
+		
 }
 
 
@@ -437,12 +381,6 @@ void iniciarPeatones() {
 	}
 	CRUCE_fin_peatOn();
 	
-
-}
-int comprobarPos(struct posiciOn coordPosSig){
-	
-	
-
 
 }
 
